@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Smoothie HQ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="styles.css?v=3.1" />
+</head>
+<body class="bg-slate-100 text-slate-900 min-h-screen flex flex-col antialiased">
+
+  <!-- Floating Toast Notification -->
+  <div id="appToast" class="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl shadow-xl font-bold text-xs text-white transition-all duration-200 opacity-0 translate-y-4 pointer-events-none bg-slate-900">
+    Notification
+  </div>
+
+  <!-- Minimal Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
+    <div class="max-w-5xl mx-auto px-3 sm:px-6">
+      <div class="flex items-center justify-between h-14 sm:h-16 gap-2">
+        
+        <!-- Brand Title -->
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <h1 class="text-sm sm:text-base font-black tracking-tight text-slate-900 whitespace-nowrap">
+            Smoothie HQ
+          </h1>
+          <span id="lastSavedStatus" class="text-[11px] text-slate-400 font-medium hidden md:inline">Saved</span>
+        </div>
+
+        <!-- 2 Main Modes Switcher (Ultra-Simple for Any Age, Responsive Labels) -->
+        <div class="flex bg-slate-100 p-0.5 sm:p-1 rounded-xl border border-slate-200 gap-0.5 sm:gap-1 font-bold text-xs">
+          <button type="button" id="navModePlan" class="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg transition bg-white text-slate-900 shadow-sm flex items-center gap-1 whitespace-nowrap">
+            <span>📋</span>
+            <span class="sm:hidden">Plan</span>
+            <span class="hidden sm:inline">Plan & Recipe</span>
+          </button>
+          <button type="button" id="navModeMake" class="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg transition text-slate-500 hover:text-slate-900 flex items-center gap-1 whitespace-nowrap">
+            <span>🥣</span>
+            <span class="sm:hidden">Make</span>
+            <span class="hidden sm:inline">Make (Scale)</span>
+          </button>
+        </div>
+
+        <!-- Sync & Settings -->
+        <div class="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+          <button type="button" id="openDataManagementBtn" class="px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold transition" title="Sync Data">
+            Sync
+          </button>
+          <button type="button" id="openSettingsBtn" class="p-1.5 sm:p-2 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition" title="Settings">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6">
+
+    <!-- ============================================================= -->
+    <!-- VIEW 1: PLAN & RECIPE (UNIFIED CONFIGURATION & KITCHEN SUPPLY) -->
+    <!-- ============================================================= -->
+    <div id="viewPlanRecipe" class="space-y-6">
+
+      <!-- 1. Recipe Selector & Top Actions -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-sm">
+        <div class="flex items-center gap-2 flex-1">
+          <label for="recipeSelect" class="text-xs font-bold text-slate-500 uppercase tracking-wider">Blend:</label>
+          <div class="relative flex-1 max-w-md">
+            <select id="recipeSelect" class="w-full bg-slate-50 border border-slate-300 font-extrabold text-slate-900 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-slate-900 appearance-none pr-8">
+              <!-- Injected via JS -->
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+          </div>
+          <button type="button" id="createNewRecipeBtn" class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition">
+            + New
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2 justify-end">
+          <button type="button" id="openVersionHistoryBtn" class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition">
+            Versions <span id="builderCurrentVersionTag" class="px-1 py-0.2 rounded bg-slate-100 text-slate-700 font-mono text-[10px]">v1.0</span>
+          </button>
+          <button type="button" id="deleteCurrentRecipeBtn" class="px-3 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs transition">
+            Delete
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. Step 1: Batch Sizer (Big, clear, intuitive for a 9yo or 90yo) -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+          <div>
+            <h2 class="text-base font-black text-slate-900">1. Who is drinking & for how many days?</h2>
+            <p class="text-xs text-slate-500">Adjust the count to size your blender and storage containers automatically.</p>
+          </div>
+          <div class="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 self-start sm:self-auto">
+            Total Batch: <span id="statYield" class="text-sm font-black">2,500 g</span>
+          </div>
+        </div>
+
+        <!-- Giant Friendly Number Steppers -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+            <label class="block text-[11px] font-bold text-slate-500 uppercase">People</label>
+            <input type="number" id="calcNumPeople" min="1" max="20" value="5" class="w-full text-center mt-1 text-2xl font-black font-mono text-slate-900 bg-transparent border-0 focus:ring-0" />
+            <span class="text-[10px] text-slate-400 font-medium">Household</span>
+          </div>
+
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+            <label class="block text-[11px] font-bold text-slate-500 uppercase">Days</label>
+            <input type="number" id="calcDaysSupply" min="1" max="30" value="2" class="w-full text-center mt-1 text-2xl font-black font-mono text-slate-900 bg-transparent border-0 focus:ring-0" />
+            <span class="text-[10px] text-slate-400 font-medium">Days Supply</span>
+          </div>
+
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+            <label class="block text-[11px] font-bold text-slate-500 uppercase">Glasses / Day</label>
+            <input type="number" id="calcGlassesPerDay" min="0.5" step="0.5" max="5" value="1" class="w-full text-center mt-1 text-2xl font-black font-mono text-slate-900 bg-transparent border-0 focus:ring-0" />
+            <span class="text-[10px] text-slate-400 font-medium">per person</span>
+          </div>
+
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+            <label class="block text-[11px] font-bold text-slate-700 uppercase">+ Guests</label>
+            <input type="number" id="calcGuestGlasses" min="0" max="30" value="0" placeholder="0" class="w-full text-center mt-1 text-2xl font-black font-mono text-slate-900 bg-transparent border-0 focus:ring-0" />
+            <span class="text-[10px] text-slate-400 font-medium">Extra glasses</span>
+          </div>
+        </div>
+
+        <!-- Quick Summary Feed Stats -->
+        <div class="grid grid-cols-3 gap-2 pt-1 text-xs text-center font-medium text-slate-600">
+          <div class="p-2 bg-slate-50 rounded-lg border border-slate-100">
+            <span class="text-slate-400 block text-[10px] uppercase font-bold">Portions</span>
+            <span id="statGlasses" class="font-bold text-slate-900 font-mono">10.0 glasses</span>
+          </div>
+          <div class="p-2 bg-slate-50 rounded-lg border border-slate-100">
+            <span class="text-slate-400 block text-[10px] uppercase font-bold">Containers</span>
+            <span id="statContainers" class="font-bold text-slate-900 font-mono">2.5 &times; 1L</span>
+          </div>
+          <div class="p-2 bg-slate-50 rounded-lg border border-slate-100">
+            <span class="text-slate-400 block text-[10px] uppercase font-bold">Blender Loads</span>
+            <span id="statBlenders" class="font-bold text-slate-900 font-mono">1.3 loads</span>
+          </div>
+        </div>
+
+        <!-- Liquid / Produce 50/50 Gauge -->
+        <div class="pt-2" id="liquidProduceRatioBar"></div>
+      </div>
+
+      <!-- 3. Step 2: Recipe Ingredients, Sliders & Drag Reorder -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+        
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-base font-black text-slate-900">2. Ingredients & Proportions</h2>
+              <span id="builderUnsavedBadge" class="hidden px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900">
+                Unsaved
+              </span>
+            </div>
+            <p class="text-xs text-slate-500">Drag <strong class="text-slate-700 font-mono">⋮⋮</strong> to change order. Lock <strong class="text-slate-700">🔒</strong> to freeze an amount.</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <div id="builderTotalPctBadge"></div>
+            <button type="button" id="discardChangesBtn" class="hidden px-3 py-1.5 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold text-xs transition">
+              Discard
+            </button>
+            <button type="button" id="addIngredientToRecipeBtn" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition">
+              + Add Item
+            </button>
+            <button type="button" id="saveCurrentRecipeBtn" class="px-4 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition shadow-sm">
+              Save Changes
+            </button>
+          </div>
+        </div>
+
+        <!-- FAST INGREDIENT MATCHER ADVISOR -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+          <label for="quickMatcherInput" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Ingredient Advisor:
+          </label>
+          <input type="text" id="quickMatcherInput" placeholder="Type an ingredient (e.g. strawberries, kale, chia seeds)..." class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 bg-white focus:ring-2 focus:ring-slate-900" />
+          <div id="quickMatcherResultBox" class="mt-2 hidden"></div>
+        </div>
+
+        <!-- Interactive Ingredients Cards List -->
+        <div class="pt-1 space-y-2.5" id="builderIngredientsRows"></div>
+
+        <!-- Blending notes -->
+        <div class="pt-3 border-t border-slate-100">
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Blending Notes:</label>
+          <input type="text" id="builderRecipeNotesInput" class="w-full px-3 py-1.5 border border-slate-300 rounded-xl text-xs text-slate-800" placeholder="Add liquid first, soft produce next, dense produce last" />
+        </div>
+      </div>
+
+      <!-- 4. Step 3: Kitchen Intelligence (Fridge Storage & Grocery List Unified) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <!-- Fridge Storage Card -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <h3 class="text-sm font-black text-slate-900">❄️ Fridge Storage & Prep</h3>
+            <span class="text-[11px] text-slate-500">In-fridge limits</span>
+          </div>
+          <div id="fridgeStoragePlanContainer" class="space-y-2"></div>
+        </div>
+
+        <!-- Grocery List Card -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <h3 class="text-sm font-black text-slate-900">🛒 Grocery Shopping</h3>
+            <button type="button" id="copyGroceryListBtn" class="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition">
+              Copy List
+            </button>
+          </div>
+          <div id="grocerySummaryStats"></div>
+          <div id="groceryCadenceListContainer" class="space-y-3 pt-1"></div>
+        </div>
+
+      </div>
+
+      <!-- 5. Batch Rating & Taste Logs (Collapsible / Clean) -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+          <h3 class="text-sm font-black text-slate-900">⭐ Batch Taste Logs</h3>
+          <button type="button" id="openNewLogBtn" class="px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition">
+            + Log Batch
+          </button>
+        </div>
+        <div id="tasteLogsList" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1"></div>
+      </div>
+
+    </div>
+
+
+    <!-- ============================================================= -->
+    <!-- VIEW 2: MAKE / SCALE MODE (DISTRACTION-FREE BIG SCREEN) -->
+    <!-- ============================================================= -->
+    <div id="viewMakeScale" class="hidden space-y-6">
+      
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+        <div>
+          <h2 class="text-base font-black text-slate-900">Scale Assistant</h2>
+          <p class="text-xs text-slate-500">Put blender jar on scale & add each item</p>
+        </div>
+        <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+          <button type="button" id="scaleViewTare" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-900 text-white shadow-sm">Tare (0g + Target)</button>
+          <button type="button" id="scaleViewCumul" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 hover:bg-slate-200">Cumulative Target</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Giant Active Step Target Display -->
+        <div class="lg:col-span-7" id="kitchenMainDisplay"></div>
+        
+        <!-- Checklist on the side -->
+        <div class="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Sequence</h3>
+          <div id="kitchenStepsList" class="space-y-2"></div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-4 mt-8 text-center text-xs text-slate-400">
+    <div class="max-w-5xl mx-auto px-4 flex items-center justify-between">
+      <div></div>
+      <div class="flex items-center gap-3">
+        <button type="button" id="exportDataBtn" class="hover:text-slate-800 underline font-medium">Download Backup (.json)</button>
+        <label class="hover:text-slate-800 underline font-medium cursor-pointer">
+          <span>Restore Backup</span>
+          <input type="file" id="importDataInput" class="hidden" accept=".json" />
+        </label>
+      </div>
+    </div>
+  </footer>
+
+  <!-- DELETE RECIPE CONFIRM MODAL -->
+  <div id="confirmDeleteRecipeModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl p-5 max-w-sm w-full shadow-xl border border-slate-100 text-center">
+      <h3 class="text-sm font-black text-slate-900">Delete Recipe?</h3>
+      <p class="text-xs text-slate-500 mt-1">Delete <strong id="deleteRecipeTargetName" class="text-slate-800">this recipe</strong>?</p>
+      
+      <div class="mt-4 flex justify-center gap-2">
+        <button type="button" id="cancelDeleteBtn" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition">
+          Cancel
+        </button>
+        <button type="button" id="confirmExecuteDeleteBtn" class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition">
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DATA MANAGEMENT & SYNC MODAL -->
+  <div id="dataManagementModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl p-5 max-w-lg w-full shadow-xl border border-slate-100 space-y-3">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <h3 class="text-sm font-black text-slate-900">Data Sync & Backup</h3>
+        <button type="button" id="closeDataModalBtn" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+      </div>
+
+      <p class="text-xs text-slate-500">
+        Sync all your custom recipes and settings across phones, laptops, and tablets.
+      </p>
+
+      <div>
+        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Recipe Database (JSON)</label>
+        <textarea id="syncJsonArea" rows="6" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono text-[11px] text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-900" placeholder="Recipe JSON data will appear here..."></textarea>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 pt-1">
+        <button type="button" id="copyDbClipboardBtn" class="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition text-center">
+          📋 Copy to Clipboard
+        </button>
+        
+        <button type="button" id="pasteDbRestoreBtn" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold text-xs rounded-xl transition text-center border border-slate-300">
+          📥 Load from Box Above
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CREATE NEW RECIPE MODAL -->
+  <div id="createRecipeModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl p-5 max-w-md w-full shadow-xl border border-slate-100">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm font-black text-slate-900">Create Recipe</h3>
+        <button type="button" id="closeCreateRecipeModalBtn" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+      </div>
+      <div class="py-3 space-y-3 text-xs">
+        <div>
+          <label class="block font-bold text-slate-600 mb-1">Recipe Name</label>
+          <input type="text" id="newRecipeNameInput" placeholder="e.g. Morning Glow" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900" />
+        </div>
+        <div>
+          <label class="block font-bold text-slate-600 mb-1">Type</label>
+          <select id="newRecipeTypeSelect" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900">
+            <option value="fruit">Fruit</option>
+            <option value="veggie">Veggie</option>
+            <option value="combo" selected>Fruit & Veggie Combo</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-600 mb-1">Description</label>
+          <input type="text" id="newRecipeDescInput" placeholder="Description" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-800" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+        <button type="button" id="confirmCreateRecipeBtn" class="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition">
+          Create
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CREATE SNAPSHOT MODAL -->
+  <div id="createSnapshotModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl p-5 max-w-md w-full shadow-xl border border-slate-100">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm font-black text-slate-900">Save Snapshot</h3>
+        <button type="button" id="closeSnapshotModalBtn" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+      </div>
+      <div class="py-3 space-y-3 text-xs">
+        <div>
+          <label class="block font-bold text-slate-600 mb-1">Version Label</label>
+          <input type="text" id="snapshotNameInput" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900" />
+        </div>
+        <div>
+          <label class="block font-bold text-slate-600 mb-1">Notes</label>
+          <input type="text" id="snapshotNotesInput" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-800" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+        <button type="button" id="confirmSaveSnapshotBtn" class="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition">
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VERSION SNAPSHOTS MODAL -->
+  <div id="versionHistoryModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl p-5 max-w-lg w-full shadow-xl border border-slate-100 max-h-[80vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm font-black text-slate-900">Version History</h3>
+        <button type="button" id="closeVersionModalBtn" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+      </div>
+
+      <div class="py-3 space-y-2 overflow-y-auto flex-1" id="versionHistoryList"></div>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settingsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl p-5 max-w-md w-full shadow-xl border border-slate-100">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm font-black text-slate-900">Household Parameters</h3>
+        <button type="button" id="closeSettingsBtn" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+      </div>
+
+      <div class="py-3 space-y-3 text-xs">
+        <div>
+          <label class="block font-bold text-slate-600 mb-1">Number of People</label>
+          <input type="number" id="setNumPeople" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold font-mono text-slate-900" min="1" max="20" />
+        </div>
+        <div>
+          <label class="block font-bold text-slate-600 mb-1">Serving Glass Size (grams)</label>
+          <input type="number" id="setGlassSize" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold font-mono text-slate-900" min="100" max="1000" step="10" />
+        </div>
+        <div>
+          <label class="block font-bold text-slate-600 mb-1">Blender Max Capacity (grams)</label>
+          <input type="number" id="setBlenderCap" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold font-mono text-slate-900" min="500" max="5000" step="50" />
+        </div>
+        <div>
+          <label class="block font-bold text-slate-600 mb-1">Storage Container Size (grams)</label>
+          <input type="number" id="setContainerSize" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold font-mono text-slate-900" min="200" max="5000" step="50" />
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+        <button type="button" id="saveSettingsBtn" class="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition">
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOG BATCH MODAL -->
+  <div id="logBatchModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl p-5 max-w-md w-full shadow-xl border border-slate-100">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm font-black text-slate-900">Log Batch</h3>
+        <button type="button" id="closeLogModalBtn" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+      </div>
+
+      <div class="py-3 space-y-3 text-xs">
+        <div>
+          <label class="block font-bold text-slate-600 mb-1">Recipe</label>
+          <select id="logRecipeSelect" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900"></select>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-600 mb-1">Rating</label>
+          <select id="logRatingSelect" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900">
+            <option value="5">★★★★★ - Perfect</option>
+            <option value="4">★★★★☆ - Great</option>
+            <option value="3">★★★☆☆ - Decent</option>
+            <option value="2">★★☆☆☆ - Needs adjustment</option>
+            <option value="1">★☆☆☆☆ - Not enjoyable</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-600 mb-1">Notes</label>
+          <textarea id="logNotesText" rows="2" placeholder="Taste & texture notes" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs text-slate-800"></textarea>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+        <button type="button" id="saveLogEntryBtn" class="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition">
+          Save Log
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=3.1"></script>
+</body>
+</html>

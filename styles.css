@@ -1,0 +1,188 @@
+/* Custom styles complementing Tailwind CSS */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap');
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Subtle Page / Tab Transitions */
+[data-tab-pane]:not(.hidden) {
+  animation: tabFadeIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Smooth Interactive Buttons */
+button {
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Ingredient Card & Drag Animations */
+.ingredient-card {
+  transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.18s ease, border-color 0.15s ease, opacity 0.18s ease;
+  will-change: transform, box-shadow;
+}
+
+.ingredient-card:hover {
+  border-color: #cbd5e1;
+}
+
+.drag-handle {
+  transition: transform 0.12s ease, color 0.12s ease;
+  touch-action: none;
+}
+
+.drag-handle:hover {
+  transform: scale(1.18);
+}
+
+.drag-handle:active {
+  transform: scale(1.05);
+}
+
+.ingredient-card.is-dragging {
+  opacity: 0.45;
+  transform: scale(0.99);
+  border-style: dashed;
+  border-color: #94a3b8;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
+}
+
+.ingredient-card.drop-target-top {
+  border-top: 2px solid #0f172a !important;
+  transform: translateY(2px);
+}
+
+.ingredient-card.drop-target-bottom {
+  border-bottom: 2px solid #0f172a !important;
+  transform: translateY(-2px);
+}
+
+/* Range Slider Styling */
+input[type=range] {
+  -webkit-appearance: none;
+  background: transparent;
+}
+
+input[type=range]:focus {
+  outline: none;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #0f172a;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  cursor: pointer;
+  margin-top: -5px;
+  transition: transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease;
+}
+
+input[type=range]::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+  background: #334155;
+}
+
+input[type=range]::-webkit-slider-thumb:active {
+  transform: scale(1.1);
+  background: #0f172a;
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 6px;
+  cursor: pointer;
+  background: #e2e8f0;
+  border-radius: 9999px;
+}
+
+/* Scale Mode Animations */
+.scale-hero-display {
+  animation: scaleStepEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes scaleStepEnter {
+  from {
+    opacity: 0.7;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.scale-weight-pop {
+  animation: weightPop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes weightPop {
+  0% {
+    transform: scale(0.94);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.checklist-step-item {
+  transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.checklist-step-item:hover {
+  transform: translateX(2px);
+}
+
+.check-pop {
+  animation: checkPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes checkPop {
+  0% {
+    transform: scale(0.6);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
