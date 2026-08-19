@@ -285,40 +285,159 @@ const DEFAULT_STATE = {
   recipes: [
     {
       id: "house-fruit-blend",
-      name: "House Tropical Fruit Blend",
+      name: "Generic Fruit Blend",
       type: "fruit",
       isDefault: true,
-      description: "Balanced 50/50 tropical fruit juice with avocado, papaya, pineapple, mango, and lemon.",
+      description: "All in one tropical fruit juice. Creamy avocado body, fragrant papaya, bright pineapple, sweet mango, and balancing lemon.",
       baseBatchWeight: 2000,
-      blendingNotes: "Add water first, soft produce next, dense fruit last, lemon on top.",
+      blendingNotes: "1. Pour water first to protect blades. 2. Add soft fruits (avocado, papaya). 3. Add pineapple & mango. 4. Top with lemon juice and sugar.",
       ingredients: [
-        { id: "water", name: "Water / Cold Filtered", grams: 1000, pct: 50.0, locked: true, order: 1, notes: "Base liquid (50%)" },
-        { id: "avocado", name: "Avocado (Hass)", grams: 215, pct: 10.75, locked: false, order: 2, notes: "Creamy body" },
-        { id: "papaya", name: "Papaya (Maradol / Red)", grams: 242, pct: 12.1, locked: false, order: 3, notes: "Peeled & seeded chunks" },
-        { id: "pineapple", name: "Pineapple", grams: 275, pct: 13.75, locked: false, order: 4, notes: "Sweet tropical acidity" },
-        { id: "mango", name: "Mango (Ataulfo / Kent)", grams: 148, pct: 7.4, locked: false, order: 5, notes: "Floral richness" },
-        { id: "lemon", name: "Lemon (Eureka / Meyer)", grams: 120, pct: 6.0, locked: false, order: 6, notes: "Fresh squeeze" },
-        { id: "sugar", name: "Sugar", grams: 40, pct: 2.0, locked: false, order: 7, notes: "Optional sweetness booster" }
+        { id: "water", name: "Water / Cold Filtered", grams: 1100, pct: 55, locked: true, order: 1, notes: "Base liquid (50% ratio)" },
+        { id: "avocado", name: "Avocado", grams: 115, pct: 5.77, locked: false, order: 2, notes: "Creamy body & healthy fats" },
+        { id: "papaya", name: "Papaya", grams: 175, pct: 8.77, locked: false, order: 3, notes: "Peeled & seeded chunks" },
+        { id: "pineapple", name: "Pineapple", grams: 440, pct: 21.99, locked: false, order: 4, notes: "Sweet tropical acidity" },
+        { id: "mango", name: "Mango", grams: 72, pct: 3.58, locked: false, order: 5, notes: "Floral richness" },
+        { id: "lemon", name: "Lemon (Juice)", grams: 58, pct: 2.89, locked: false, order: 6, notes: "Fresh squeeze to balance sweetness" },
+        { id: "sugar", name: "Honey", grams: 40, pct: 2, locked: false, order: 7, notes: "Optional sweetness booster" }
       ],
       versions: []
     },
     {
       id: "house-green-glow",
-      name: "House Green Vitality",
+      name: "Generic Veggie Blend",
       type: "veggie",
       isDefault: true,
-      description: "Crisp green blend with cucumber, green apple, celery, baby spinach, lemon, and ginger.",
+      description: "Crisp, ultra-hydrating, refreshing green blend with zero bitterness. High cucumber with subtle ginger and bright lemon.",
       baseBatchWeight: 2000,
-      blendingNotes: "Add water first, cucumber and celery next, spinach in middle, apple and ginger on top.",
+      blendingNotes: "1. Pour water first. 2. Add cucumber & celery chunks. 3. Pack spinach in middle. 4. Add green apple, ginger, lemon juice, and honey on top.",
       ingredients: [
-        { id: "water", name: "Water / Cold Filtered", grams: 1000, pct: 50.0, locked: true, order: 1, notes: "Base liquid (50%)" },
-        { id: "cucumber", name: "Cucumber (English / Persian)", grams: 350, pct: 17.5, locked: false, order: 2, notes: "Hydrating base" },
-        { id: "green_apple", name: "Green Apple (Granny Smith)", grams: 250, pct: 12.5, locked: false, order: 3, notes: "Tart sweetness" },
-        { id: "celery", name: "Celery", grams: 200, pct: 10.0, locked: false, order: 4, notes: "Crisp mineral notes" },
-        { id: "baby_spinach", name: "Baby Spinach", grams: 100, pct: 5.0, locked: false, order: 5, notes: "Gentle greens" },
-        { id: "lemon", name: "Lemon (Eureka / Meyer)", grams: 70, pct: 3.5, locked: false, order: 6, notes: "Acidity balance" },
-        { id: "ginger", name: "Fresh Ginger", grams: 15, pct: 0.75, locked: false, order: 7, notes: "Digestive spice" },
-        { id: "honey", name: "Honey", grams: 15, pct: 0.75, locked: false, order: 8, notes: "Optional roundness" }
+        { id: "water", name: "Water / Cold Filtered", grams: 1250, pct: 50, locked: true, order: 1, notes: "Base liquid" },
+        { id: "cucumber", name: "Beet root", grams: 357, pct: 14.27, locked: false, order: 2, notes: "Hydrating, mild base" },
+        { id: "green_apple", name: "Zucchini", grams: 321, pct: 12.85, locked: false, order: 3, notes: "Natural tart sweetness" },
+        { id: "celery", name: "Sweet Potato", grams: 259, pct: 10.36, locked: false, order: 4, notes: "Crisp mineral notes" },
+        { id: "spinach", name: "Garlic", grams: 20, pct: 0.8, locked: true, order: 5, notes: "Gentle greens" },
+        { id: "lemon", name: "Lemon Juice", grams: 92, pct: 3.69, locked: false, order: 6, notes: "Cuts earthy notes" },
+        { id: "ginger", name: "Fresh Ginger", grams: 20, pct: 0.81, locked: true, order: 7, notes: "Warm digestive spice" },
+        { id: "honey", name: "Honey", grams: 50, pct: 2, locked: false, order: 8, notes: "Optional roundness" },
+        { id: "custom_1787149476062", name: "Fruits (mango, papaya, avocado, pineapple)", pct: 5.22, grams: 131, locked: false, order: 9, notes: "Chopped" }
+      ],
+      versions: []
+    },
+    {
+      id: "recipe_1787136475489",
+      name: "ወርቃማው ማለዳ",
+      type: "fruit",
+      isDefault: false,
+      description: "A creamy tropical blend where the peppery bite of papaya seeds cuts through rich mango and papaya sweetness.",
+      baseBatchWeight: 2000,
+      blendingNotes: "Add liquid base first, soft produce next, dense produce last.",
+      ingredients: [
+        { id: "water", name: "Cold water", grams: 1156, pct: 46.23, locked: true, order: 1, notes: "Blending base to adjust pourability" },
+        { id: "fruit_1", name: "Papaya", grams: 585, pct: 23.39, locked: false, order: 2, notes: "Sweet, creamy tropical base" },
+        { id: "fruit_2", name: "Mango", grams: 606, pct: 24.25, locked: false, order: 3, notes: "Rich sweetness and silky body" },
+        { id: "lemon", name: "Lemon Juice", grams: 113, pct: 4.5, locked: true, order: 4, notes: "Cuts through the heavy sweetness" },
+        { id: "custom_1787136518180", name: "Papaya Seeds", pct: 0.92, grams: 23, locked: true, order: 5, notes: "Peppery kick" },
+        { id: "custom_1787152682633", name: "Cinamon", pct: 0.41, grams: 10, locked: true, order: 6, notes: "Chopped" },
+        { id: "custom_1787152693787", name: "Salt", pct: 0.3, grams: 8, locked: true, order: 7, notes: "Chopped" }
+      ],
+      versions: []
+    },
+    {
+      id: "recipe_1787136756947",
+      name: "የደስ ደስ",
+      type: "fruit",
+      isDefault: false,
+      description: "Uses the nutrient-dense pineapple core balanced with rich avocado flesh and lemon to keep it bright and silky.",
+      baseBatchWeight: 2000,
+      blendingNotes: "Add liquid base first, soft produce next, dense produce last.",
+      ingredients: [
+        { id: "water", name: "Water / Cold Filtered", grams: 1317, pct: 52.66, locked: true, order: 1, notes: "Base liquid (50%)" },
+        { id: "fruit_1", name: "Pineapple", grams: 610, pct: 24.41, locked: false, order: 2, notes: "Fresh prepped" },
+        { id: "fruit_2", name: "Avocado", grams: 408, pct: 16.3, locked: false, order: 3, notes: "Sweetness & aroma" },
+        { id: "lemon", name: "Lemon Juice", grams: 108, pct: 4.32, locked: true, order: 4, notes: "Acidity balance" },
+        { id: "custom_1787136784900", name: "Lemon Zest", pct: 0.51, grams: 13, locked: true, order: 5, notes: "Chopped chunks" },
+        { id: "custom_1787152837959", name: "Ginger", pct: 1.5, grams: 38, locked: true, order: 6, notes: "Chopped" },
+        { id: "custom_1787152849795", name: "Cinnamon", pct: 0.3, grams: 8, locked: true, order: 7, notes: "Chopped" }
+      ],
+      versions: []
+    },
+    {
+      id: "recipe_1787153877894",
+      name: "የፀሐይ ቶኒክ",
+      type: "fruit",
+      isDefault: false,
+      description: "A bright, exotic tonic with warm spices and citrus oils that wake up the palate.",
+      baseBatchWeight: 2000,
+      blendingNotes: "Add liquid base first, soft produce next, dense produce last.",
+      ingredients: [
+        { id: "water", name: "Water / Cold Filtered", grams: 1375, pct: 55, locked: true, order: 1, notes: "Base liquid (50%)" },
+        { id: "ing_1", name: "Mango", grams: 529, pct: 21.17, locked: false, order: 2, notes: "Base produce" },
+        { id: "ing_2", name: "Pineapple", grams: 371, pct: 14.83, locked: false, order: 3, notes: "Sweetness" },
+        { id: "lemon", name: "Lemon juice", grams: 163, pct: 6.5, locked: true, order: 4, notes: "Acidity" },
+        { id: "custom_1787153897922", name: "Ginger", pct: 1, grams: 25, locked: true, order: 5, notes: "Mild warmth" },
+        { id: "custom_1787153905713", name: "Papaya seed", pct: 0.8, grams: 20, locked: true, order: 6, notes: "Mustard-seed spice" },
+        { id: "custom_1787153916550", name: "Korarima", pct: 0.4, grams: 10, locked: true, order: 7, notes: "Smoky, herbal depth" },
+        { id: "custom_1787153927480", name: "Lemon Zest", pct: 0.3, grams: 8, locked: true, order: 8, notes: "Fragrant citrus oils" }
+      ],
+      versions: []
+    },
+    {
+      id: "recipe_1787154136851",
+      name: "Earthy Ruby Zing",
+      type: "veggie",
+      isDefault: false,
+      description: "Beetroot’s earthiness is completely transformed by the bright bromelain acidity of pineapple and spicy ginger.",
+      baseBatchWeight: 2000,
+      blendingNotes: "Add liquid base first, soft produce next, dense produce last.",
+      ingredients: [
+        { id: "water", name: "Water", grams: 1087, pct: 43.48, locked: true, order: 1, notes: "Base liquid (50%)" },
+        { id: "custom_1787154167271", name: "Papaya", pct: 10.28, grams: 257, locked: false, order: 2, notes: "Chopped" },
+        { id: "ing_1", name: "Pineapple", grams: 569, pct: 22.75, locked: false, order: 3, notes: "Base produce" },
+        { id: "ing_2", name: "Beetroot", grams: 412, pct: 16.49, locked: false, order: 4, notes: "Sweetness" },
+        { id: "lemon", name: "Lemon Juice", grams: 125, pct: 5, locked: true, order: 5, notes: "Acidity" },
+        { id: "custom_1787154178235", name: "Ginger", pct: 1.7, grams: 43, locked: true, order: 6, notes: "Chopped" },
+        { id: "custom_1787154182584", name: "Cinamon", pct: 0.3, grams: 8, locked: true, order: 7, notes: "Chopped" }
+      ],
+      versions: []
+    },
+    {
+      id: "recipe_1787154384262",
+      name: "Spiced Potato Velvet",
+      type: "veggie",
+      isDefault: false,
+      description: "A creamy, soothing spiced smoothie that tastes like a dessert pudding rather than raw vegetables.",
+      baseBatchWeight: 2000,
+      blendingNotes: "Add liquid base first, soft produce next, dense produce last.",
+      ingredients: [
+        { id: "water", name: "Water / Cold Filtered", grams: 1000, pct: 40, locked: true, order: 1, notes: "Base liquid (50%)" },
+        { id: "ing_1", name: "Papaya", grams: 606, pct: 24.25, locked: false, order: 2, notes: "Base produce" },
+        { id: "ing_2", name: "Sweet potato", grams: 375, pct: 15, locked: false, order: 3, notes: "Sweetness" },
+        { id: "lemon", name: "Avocado", grams: 311, pct: 12.45, locked: false, order: 4, notes: "Acidity" },
+        { id: "custom_1787154405392", name: "Lemon juice", pct: 6, grams: 150, locked: true, order: 5, notes: "Chopped" },
+        { id: "custom_1787154408961", name: "Ginger", pct: 1.5, grams: 38, locked: true, order: 6, notes: "Chopped" },
+        { id: "custom_1787154413357", name: "Cinnamon", pct: 0.5, grams: 13, locked: true, order: 7, notes: "Chopped" },
+        { id: "custom_1787154423620", name: "Salt", pct: 0.2, grams: 5, locked: true, order: 8, notes: "Chopped" },
+        { id: "custom_1787154427677", name: "Garlic", pct: 0.1, grams: 3, locked: true, order: 9, notes: "OPTIONAL" }
+      ],
+      versions: []
+    },
+    {
+      id: "recipe_1787154574824",
+      name: "Green Glow",
+      type: "veggie",
+      isDefault: false,
+      description: "Zucchini provides a light, crisp, high-volume base without any bitterness, blending invisibly into tart pineapple and avocado.",
+      baseBatchWeight: 2000,
+      blendingNotes: "Add liquid base first, soft produce next, dense produce last.",
+      ingredients: [
+        { id: "water", name: "Water / Cold Filtered", grams: 1375, pct: 55, locked: true, order: 1, notes: "Base liquid (50%)" },
+        { id: "ing_1", name: "Zucchini", grams: 275, pct: 11.01, locked: false, order: 2, notes: "Base produce" },
+        { id: "ing_2", name: "Pineapple", grams: 375, pct: 14.99, locked: false, order: 3, notes: "Sweetness" },
+        { id: "lemon", name: "Avocado", grams: 275, pct: 10.99, locked: false, order: 4, notes: "Acidity" },
+        { id: "custom_1787154600707", name: "Lemon  juice", pct: 6, grams: 150, locked: true, order: 5, notes: "Chopped" },
+        { id: "custom_1787154621419", name: "Ginger", pct: 1.2, grams: 30, locked: true, order: 6, notes: "Chopped" },
+        { id: "custom_1787154627123", name: "Korarima", pct: 0.31, grams: 8, locked: true, order: 7, notes: "Chopped" },
+        { id: "custom_1787154659099", name: "Lemon zest", pct: 0.5, grams: 13, locked: true, order: 8, notes: "Chopped" }
       ],
       versions: []
     }
