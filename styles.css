@@ -219,6 +219,21 @@ input[type=range]::-webkit-slider-runnable-track {
   min-height: 34px;
 }
 
+/* Ensure ingredient names are never squished or hidden on mobile */
+.ing-name-input {
+  min-width: 120px !important;
+  width: 100% !important;
+  font-weight: 800 !important;
+}
+
 .session-avail-input:focus {
+  background-color: #ffffff;
+}
+
+.produce-inventory-card {
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.produce-inventory-card:focus-within {
+  border-color: #0f172a;
   background-color: #ffffff;
 }

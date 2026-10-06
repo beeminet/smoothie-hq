@@ -471,8 +471,9 @@ class JuiceApp {
     const veggieDefault = this.state.recipes.find(r => r.type === "veggie") || this.state.recipes[1] || this.state.recipes[0];
     this.sessionFruitRecipeId = fruitDefault?.id || null;
     this.sessionVeggieRecipeId = veggieDefault?.id || null;
-    this.sessionFilter = "shared";
+    this.sessionFilter = "all";
     this.sessionCounterStock = {};
+    this.sessionSharedSplits = {};
     this.isDualBlendExpanded = true;
 
     this.init();
@@ -1251,6 +1252,18 @@ class JuiceApp {
       });
     });
 
+    document.getElementById("sessionPrefillBtn")?.addEventListener("click", () => {
+      this.prefillSessionProduceFromRecipes();
+    });
+
+    document.getElementById("sessionClearBtn")?.addEventListener("click", () => {
+      this.clearSessionProduce();
+    });
+
+    document.getElementById("applySessionProduceBtn")?.addEventListener("click", () => {
+      this.applySessionProduceAllocation();
+    });
+
     document.getElementById("startSessionScaleBtn")?.addEventListener("click", () => {
       if (this.sessionFruitRecipeId) {
         this.currentRecipeId = this.sessionFruitRecipeId;
@@ -1747,56 +1760,63 @@ class JuiceApp {
 
         return `
           <div class="ingredient-card p-3 sm:p-4 bg-slate-50 border border-slate-200 rounded-2xl transition hover:border-slate-300 ${isOmitted ? "is-omitted" : ""} ${item.locked ? "bg-slate-100/80 border-slate-300" : ""}" data-ing-idx="${idx}">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-              <div class="flex items-center gap-2 flex-1 min-w-0">
-                
-                <!-- Large Thumb-Friendly Reorder & Drag Cluster -->
-                <div class="flex items-center bg-slate-200/80 rounded-xl p-1 border border-slate-300/60 flex-shrink-0 shadow-inner">
-                  <button type="button" class="reorder-up-btn w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center text-sm font-black text-slate-700 hover:text-slate-900 active:bg-slate-300 rounded-lg disabled:opacity-20 touch-manipulation select-none" data-idx="${idx}" ${idx === 0 ? "disabled" : ""} title="Move Up">▲</button>
-                  <div class="drag-handle cursor-grab active:cursor-grabbing w-7 h-9 sm:w-6 sm:h-8 flex items-center justify-center text-slate-400 hover:text-slate-800 text-sm font-black select-none touch-manipulation" data-ing-idx="${idx}" draggable="true" title="Drag to reorder">
-                    ⋮⋮
-                  </div>
-                  <button type="button" class="reorder-down-btn w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center text-sm font-black text-slate-700 hover:text-slate-900 active:bg-slate-300 rounded-lg disabled:opacity-20 touch-manipulation select-none" data-idx="${idx}" ${idx === recipe.ingredients.length - 1 ? "disabled" : ""} title="Move Down">▼</button>
+            
+            <!-- Row 1: Reorder Cluster + Dominant Ingredient Name + Remove Button -->
+            <div class="flex items-center gap-2 justify-between">
+              <!-- Large Thumb-Friendly Reorder & Drag Cluster -->
+              <div class="flex items-center bg-slate-200/80 rounded-xl p-0.5 border border-slate-300/60 flex-shrink-0 shadow-inner">
+                <button type="button" class="reorder-up-btn w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center text-sm font-black text-slate-700 hover:text-slate-900 active:bg-slate-300 rounded-lg disabled:opacity-20 touch-manipulation select-none" data-idx="${idx}" ${idx === 0 ? "disabled" : ""} title="Move Up">▲</button>
+                <div class="drag-handle cursor-grab active:cursor-grabbing w-6 h-9 sm:w-6 sm:h-8 flex items-center justify-center text-slate-400 hover:text-slate-800 text-sm font-black select-none touch-manipulation" data-ing-idx="${idx}" draggable="true" title="Drag to reorder">
+                  ⋮⋮
                 </div>
+                <button type="button" class="reorder-down-btn w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center text-sm font-black text-slate-700 hover:text-slate-900 active:bg-slate-300 rounded-lg disabled:opacity-20 touch-manipulation select-none" data-idx="${idx}" ${idx === recipe.ingredients.length - 1 ? "disabled" : ""} title="Move Down">▼</button>
+              </div>
 
+              <!-- INGREDIENT NAME: Dominant, bold, full available width, NEVER squeezed out on mobile! -->
+              <div class="flex-1 min-w-[120px] px-1">
+                <input type="text" class="ing-name-input w-full font-black text-base sm:text-lg ${isOmitted ? "text-slate-400 line-through" : "text-slate-900"} bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-900 focus:bg-white px-2 py-1 rounded-lg transition" value="${item.name}" placeholder="Ingredient Name" data-idx="${idx}" />
+              </div>
+
+              <!-- Remove button -->
+              ${recipe.ingredients.length > 1 ? `
+                <button type="button" class="remove-ing-btn w-9 h-9 flex items-center justify-center text-slate-400 hover:text-red-600 active:bg-red-50 rounded-xl text-xl font-bold transition flex-shrink-0 touch-manipulation" data-idx="${idx}" title="Remove permanently">
+                  &times;
+                </button>
+              ` : ""}
+            </div>
+
+            <!-- Row 2: Status Badges (Stock / Lock) & Target Grams + Percentage -->
+            <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-200/60 font-mono">
+              <div class="flex items-center gap-1.5 flex-wrap">
                 <!-- Stock / Availability Toggle -->
                 <button type="button" class="stock-toggle-btn px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 flex-shrink-0 touch-manipulation ${
                   isOmitted ? "bg-slate-200 text-slate-600 border border-slate-300" : "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
-                }" data-idx="${idx}" title="${isOmitted ? "Omitted: tap to include in batch" : "In stock: tap to omit from batch"}">
-                  <span>${isOmitted ? "⚪ Omitted" : "🟢 In Stock"}</span>
+                }" data-idx="${idx}">
+                  <span>${isOmitted ? "Omit" : "Stock"}</span>
                 </button>
 
                 <!-- Lock Toggle -->
-                <button type="button" class="lock-toggle-btn px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex-shrink-0 touch-manipulation ${
+                <button type="button" class="lock-toggle-btn px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 flex-shrink-0 touch-manipulation ${
                   item.locked ? "bg-amber-100 text-amber-900 border border-amber-300" : "bg-white text-slate-500 border border-slate-200 hover:text-slate-900"
-                }" data-idx="${idx}" ${isOmitted ? "disabled" : ""} title="${item.locked ? "Locked percentage" : "Auto-balanced"}">
-                  <span>${item.locked ? "🔒 Locked" : "🔓 Lock"}</span>
+                }" data-idx="${idx}" ${isOmitted ? "disabled" : ""}>
+                  <span>${item.locked ? "Locked" : "Lock"}</span>
                 </button>
-
-                <!-- Ingredient Name: Big, Bold, Primary Element -->
-                <input type="text" class="ing-name-input font-black text-base sm:text-lg ${isOmitted ? "text-slate-400 line-through" : "text-slate-900"} bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-900 focus:bg-white px-2 py-1 rounded-lg transition flex-1 min-w-0" value="${item.name}" placeholder="Ingredient Name" data-idx="${idx}" />
-                
-                ${recipe.ingredients.length > 1 ? `
-                  <button type="button" class="remove-ing-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 active:bg-red-50 rounded-lg text-lg font-bold transition ml-0.5 flex-shrink-0 touch-manipulation" data-idx="${idx}" title="Remove permanently">
-                    &times;
-                  </button>
-                ` : ""}
               </div>
 
               <!-- Right: Target Weight & Percentage Input -->
-              <div class="flex items-center justify-between sm:justify-end gap-3 font-mono">
+              <div class="flex items-center gap-2 flex-shrink-0">
                 <div class="text-right">
                   <div class="text-base sm:text-lg font-black ${isOmitted ? "text-slate-400 font-normal line-through" : "text-slate-900"} ing-grams-display" data-idx="${idx}">${isOmitted ? "0g" : `${scaled.scaledGrams}g`}</div>
                 </div>
 
-                <div class="relative w-20">
-                  <input type="number" step="0.1" min="0" max="100" class="ing-pct-num-input w-full pl-2 pr-6 py-1.5 border border-slate-300 rounded-xl text-xs font-mono font-bold ${isOmitted ? "text-slate-400 bg-slate-100" : "text-slate-900 bg-white"} focus:ring-2 focus:ring-slate-900" value="${Number(item.pct).toFixed(1)}" data-idx="${idx}" ${item.locked || isOmitted ? "disabled" : ""} />
-                  <span class="absolute right-2 top-1.5 text-[11px] text-slate-400 font-semibold">%</span>
+                <div class="relative w-18 sm:w-20">
+                  <input type="number" step="0.1" min="0" max="100" class="ing-pct-num-input w-full pl-2 pr-5 py-1 border border-slate-300 rounded-xl text-xs font-mono font-bold ${isOmitted ? "text-slate-400 bg-slate-100" : "text-slate-900 bg-white"} focus:ring-2 focus:ring-slate-900" value="${Number(item.pct).toFixed(1)}" data-idx="${idx}" ${item.locked || isOmitted ? "disabled" : ""} />
+                  <span class="absolute right-1.5 top-1 text-[10px] text-slate-400 font-semibold">%</span>
                 </div>
               </div>
             </div>
 
-            <!-- Proportions Slider -->
+            <!-- Row 3: Proportions Slider -->
             <div class="flex items-center gap-3 pt-1">
               <input type="range" min="0" max="80" step="0.25" value="${item.pct}" class="pct-slider flex-1 h-2 rounded-lg touch-manipulation" data-idx="${idx}" ${item.locked || isOmitted ? "disabled" : ""} />
             </div>
@@ -2330,26 +2350,26 @@ class JuiceApp {
 
   normalizeProduceKey(id, name) {
     const str = ((id || "") + " " + (name || "")).toLowerCase();
-    if (str.includes("lemon")) return { key: "lemon", name: "Lemon / Lemon Juice", icon: "🍋" };
-    if (str.includes("water") || str.includes("filtered")) return { key: "water", name: "Water / Cold Filtered", icon: "💧" };
-    if (str.includes("ginger")) return { key: "ginger", name: "Fresh Ginger", icon: "🫚" };
-    if (str.includes("pineapple")) return { key: "pineapple", name: "Pineapple", icon: "🍍" };
-    if (str.includes("avocado")) return { key: "avocado", name: "Avocado", icon: "🥑" };
-    if (str.includes("papaya")) return { key: "papaya", name: "Papaya", icon: "🍈" };
-    if (str.includes("mango")) return { key: "mango", name: "Mango", icon: "🥭" };
-    if (str.includes("cucumber")) return { key: "cucumber", name: "Cucumber", icon: "🥒" };
-    if (str.includes("celery")) return { key: "celery", name: "Celery", icon: "🥬" };
-    if (str.includes("apple")) return { key: "apple", name: "Apple", icon: "🍏" };
-    if (str.includes("spinach")) return { key: "spinach", name: "Spinach", icon: "🍃" };
-    if (str.includes("kale")) return { key: "kale", name: "Kale", icon: "🥬" };
-    if (str.includes("beet")) return { key: "beet", name: "Beetroot", icon: "🪵" };
-    if (str.includes("carrot")) return { key: "carrot", name: "Carrot", icon: "🥕" };
-    if (str.includes("zucchini")) return { key: "zucchini", name: "Zucchini", icon: "🥒" };
-    if (str.includes("sweet potato")) return { key: "sweet_potato", name: "Sweet Potato", icon: "🍠" };
-    if (str.includes("garlic")) return { key: "garlic", name: "Garlic", icon: "🧄" };
-    if (str.includes("honey") || str.includes("sugar")) return { key: "sweetener", name: "Honey / Sweetener", icon: "🍯" };
+    if (str.includes("lemon")) return { key: "lemon", name: "Lemon / Juice", icon: "" };
+    if (str.includes("water") || str.includes("filtered")) return { key: "water", name: "Water", icon: "" };
+    if (str.includes("ginger")) return { key: "ginger", name: "Ginger", icon: "" };
+    if (str.includes("pineapple")) return { key: "pineapple", name: "Pineapple", icon: "" };
+    if (str.includes("avocado")) return { key: "avocado", name: "Avocado", icon: "" };
+    if (str.includes("papaya")) return { key: "papaya", name: "Papaya", icon: "" };
+    if (str.includes("mango")) return { key: "mango", name: "Mango", icon: "" };
+    if (str.includes("cucumber")) return { key: "cucumber", name: "Cucumber", icon: "" };
+    if (str.includes("celery")) return { key: "celery", name: "Celery", icon: "" };
+    if (str.includes("apple")) return { key: "apple", name: "Apple", icon: "" };
+    if (str.includes("spinach")) return { key: "spinach", name: "Spinach", icon: "" };
+    if (str.includes("kale")) return { key: "kale", name: "Kale", icon: "" };
+    if (str.includes("beet")) return { key: "beet", name: "Beetroot", icon: "" };
+    if (str.includes("carrot")) return { key: "carrot", name: "Carrot", icon: "" };
+    if (str.includes("zucchini")) return { key: "zucchini", name: "Zucchini", icon: "" };
+    if (str.includes("sweet potato")) return { key: "sweet_potato", name: "Sweet Potato", icon: "" };
+    if (str.includes("garlic")) return { key: "garlic", name: "Garlic", icon: "" };
+    if (str.includes("honey") || str.includes("sugar")) return { key: "sweetener", name: "Honey", icon: "" };
     const cleanKey = (name || id || "produce").toLowerCase().replace(/[^a-z0-9]/g, "_");
-    return { key: cleanKey, name: name || id, icon: "🥗" };
+    return { key: cleanKey, name: name || id, icon: "" };
   }
 
   getDualBlendSessionCalculations() {
@@ -2358,6 +2378,7 @@ class JuiceApp {
     const people = this.calcPeople || 5;
     const days = this.calcDays || 2;
     const guests = this.calcGuestGlasses || 0;
+    const blenderCap = hh.blenderMaxCapacityGrams || 2000;
 
     const fruitRec = this.state.recipes.find(r => r.id === this.sessionFruitRecipeId) ||
                      this.state.recipes.find(r => r.type === "fruit") ||
@@ -2367,20 +2388,20 @@ class JuiceApp {
                       this.state.recipes[1] ||
                       this.state.recipes[0];
 
-    const fruitGlasses = people * days * (hh.fruitGlassesPerPersonPerDay || 1) + guests;
-    const veggieGlasses = people * days * (hh.veggieGlassesPerPersonPerDay || 1);
+    // Standard baseline weights from recipes
+    const standardFruitGlasses = people * days * (hh.fruitGlassesPerPersonPerDay || 1) + guests;
+    const standardVeggieGlasses = people * days * (hh.veggieGlassesPerPersonPerDay || 1);
 
-    const fruitBatchGrams = Math.round(fruitGlasses * glassSize);
-    const veggieBatchGrams = Math.round(veggieGlasses * glassSize);
-    const totalSessionGrams = fruitBatchGrams + veggieBatchGrams;
+    const standardFruitBatchGrams = Math.round(standardFruitGlasses * glassSize);
+    const standardVeggieBatchGrams = Math.round(standardVeggieGlasses * glassSize);
 
-    const fruitScaled = this.getScaledIngredients(fruitRec, fruitBatchGrams);
-    const veggieScaled = this.getScaledIngredients(veggieRec, veggieBatchGrams);
+    const fruitScaled = this.getScaledIngredients(fruitRec, standardFruitBatchGrams);
+    const veggieScaled = this.getScaledIngredients(veggieRec, standardVeggieBatchGrams);
 
     const itemsMap = new Map();
 
     fruitScaled.forEach(item => {
-      if (item.available === false) return;
+      if (item.available === false || item.id === "water") return;
       const meta = this.normalizeProduceKey(item.id, item.name);
       if (!itemsMap.has(meta.key)) {
         itemsMap.set(meta.key, {
@@ -2399,7 +2420,7 @@ class JuiceApp {
     });
 
     veggieScaled.forEach(item => {
-      if (item.available === false) return;
+      if (item.available === false || item.id === "water") return;
       const meta = this.normalizeProduceKey(item.id, item.name);
       if (!itemsMap.has(meta.key)) {
         itemsMap.set(meta.key, {
@@ -2417,24 +2438,54 @@ class JuiceApp {
       entry.veggieItem = item;
     });
 
+    // Also include any extra custom items in sessionCounterStock
+    Object.keys(this.sessionCounterStock).forEach(key => {
+      if (key === "water") return;
+      if (!itemsMap.has(key)) {
+        const catalogMatch = VALID_PRODUCE_DATABASE.find(p => p.keys.some(k => key.includes(k) || k.includes(key))) || {
+          name: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, " "),
+          type: "combo"
+        };
+        const meta = this.normalizeProduceKey(key, catalogMatch.name);
+        itemsMap.set(key, {
+          key: key,
+          displayName: meta.name,
+          icon: meta.icon,
+          fruitGrams: catalogMatch.type === "fruit" ? 100 : (catalogMatch.type === "combo" ? 50 : 0),
+          veggieGrams: catalogMatch.type === "veggie" ? 100 : (catalogMatch.type === "combo" ? 50 : 0),
+          fruitItem: null,
+          veggieItem: null
+        });
+      }
+    });
+
+    const hasAnyCounterStock = Object.keys(this.sessionCounterStock).some(k => {
+      const v = this.sessionCounterStock[k];
+      return v !== undefined && v !== null && v !== "" && Number(v) > 0;
+    });
+
     const entries = Array.from(itemsMap.values()).map(entry => {
       const isShared = entry.fruitGrams > 0 && entry.veggieGrams > 0;
       const totalNeeded = entry.fruitGrams + entry.veggieGrams;
-      const fruitPct = totalNeeded > 0 ? (entry.fruitGrams / totalNeeded) * 100 : 0;
-      const veggiePct = totalNeeded > 0 ? (entry.veggieGrams / totalNeeded) * 100 : 0;
+      
+      let defaultFruitPct = 50;
+      if (totalNeeded > 0) {
+        defaultFruitPct = Math.round((entry.fruitGrams / totalNeeded) * 100);
+      }
+      const customFruitPct = this.sessionSharedSplits ? this.sessionSharedSplits[entry.key] : undefined;
+      const activeFruitPct = customFruitPct !== undefined ? customFruitPct : defaultFruitPct;
+      const activeVeggiePct = 100 - activeFruitPct;
 
       const userAvailable = this.sessionCounterStock[entry.key];
       const hasAvailable = userAvailable !== undefined && userAvailable !== null && userAvailable !== "" && !isNaN(Number(userAvailable));
-      const availGrams = hasAvailable ? Number(userAvailable) : null;
+      const availGrams = hasAvailable ? Number(userAvailable) : 0;
 
-      let splitFruit = entry.fruitGrams;
-      let splitVeggie = entry.veggieGrams;
-      let diff = 0;
-      let status = "unentered";
+      let splitFruit = 0;
+      let splitVeggie = 0;
 
-      if (hasAvailable) {
+      if (hasAvailable && availGrams > 0) {
         if (isShared) {
-          splitFruit = Math.round((availGrams * fruitPct) / 100);
+          splitFruit = Math.round((availGrams * activeFruitPct) / 100);
           splitVeggie = availGrams - splitFruit;
         } else if (entry.fruitGrams > 0) {
           splitFruit = availGrams;
@@ -2443,7 +2494,14 @@ class JuiceApp {
           splitFruit = 0;
           splitVeggie = availGrams;
         }
-        diff = availGrams - totalNeeded;
+      } else if (!hasAnyCounterStock) {
+        splitFruit = entry.fruitGrams;
+        splitVeggie = entry.veggieGrams;
+      }
+
+      const diff = hasAvailable ? availGrams - totalNeeded : 0;
+      let status = "unentered";
+      if (hasAvailable) {
         if (diff === 0) status = "exact";
         else if (diff > 0) status = "surplus";
         else status = "short";
@@ -2453,8 +2511,8 @@ class JuiceApp {
         ...entry,
         isShared,
         totalNeeded,
-        fruitPct: Number(fruitPct.toFixed(1)),
-        veggiePct: Number(veggiePct.toFixed(1)),
+        fruitPct: activeFruitPct,
+        veggiePct: activeVeggiePct,
         hasAvailable,
         availGrams,
         splitFruit,
@@ -2464,18 +2522,64 @@ class JuiceApp {
       };
     });
 
+    // Produce weights
+    let fruitProduceGrams = 0;
+    let veggieProduceGrams = 0;
+
+    entries.forEach(e => {
+      fruitProduceGrams += e.splitFruit;
+      veggieProduceGrams += e.splitVeggie;
+    });
+
+    // 50% Water Base rule (1:1 produce to water ratio)
+    const fruitWaterGrams = fruitProduceGrams;
+    const veggieWaterGrams = veggieProduceGrams;
+
+    const activeFruitBatchGrams = fruitProduceGrams + fruitWaterGrams;
+    const activeVeggieBatchGrams = veggieProduceGrams + veggieWaterGrams;
+    const activeTotalSessionGrams = activeFruitBatchGrams + activeVeggieBatchGrams;
+    const totalProduceGrams = fruitProduceGrams + veggieProduceGrams;
+    const totalLiquidGrams = fruitWaterGrams + veggieWaterGrams;
+
+    const fruitGlasses = (activeFruitBatchGrams / glassSize).toFixed(1);
+    const veggieGlasses = (activeVeggieBatchGrams / glassSize).toFixed(1);
+    const totalGlasses = (activeTotalSessionGrams / glassSize).toFixed(1);
+    const totalLiters = (activeTotalSessionGrams / 1000).toFixed(2);
+
+    const fruitBlenders = Math.max(1, Math.ceil(activeFruitBatchGrams / blenderCap));
+    const veggieBlenders = Math.max(1, Math.ceil(activeVeggieBatchGrams / blenderCap));
+
+    const totalContainers = (activeTotalSessionGrams / (hh.containerSizeGrams || 1000)).toFixed(1);
+    const dailyTargetGlasses = people * ((hh.fruitGlassesPerPersonPerDay || 1) + (hh.veggieGlassesPerPersonPerDay || 1));
+    const daysSupplied = dailyTargetGlasses > 0 ? (totalGlasses / dailyTargetGlasses).toFixed(1) : "1.0";
+
     entries.sort((a, b) => {
       if (a.isShared && !b.isShared) return -1;
       if (!a.isShared && b.isShared) return 1;
-      return b.totalNeeded - a.totalNeeded;
+      return (b.hasAvailable ? b.availGrams : b.totalNeeded) - (a.hasAvailable ? a.availGrams : a.totalNeeded);
     });
 
     return {
       fruitRec,
       veggieRec,
-      fruitBatchGrams,
-      veggieBatchGrams,
-      totalSessionGrams,
+      fruitBatchGrams: activeFruitBatchGrams,
+      veggieBatchGrams: activeVeggieBatchGrams,
+      totalSessionGrams: activeTotalSessionGrams,
+      fruitProduceGrams,
+      veggieProduceGrams,
+      fruitWaterGrams,
+      veggieWaterGrams,
+      totalProduceGrams,
+      totalLiquidGrams,
+      fruitGlasses,
+      veggieGlasses,
+      totalGlasses,
+      totalLiters,
+      fruitBlenders,
+      veggieBlenders,
+      totalContainers,
+      daysSupplied,
+      hasAnyCounterStock,
       entries
     };
   }
@@ -2495,28 +2599,68 @@ class JuiceApp {
     const banner = document.getElementById("sessionStatsBanner");
     if (banner) {
       const hh = this.state.household;
-      const glassSize = hh.glassSizeGrams || 250;
       const contSize = hh.containerSizeGrams || 1000;
-      const totalGlasses = (data.totalSessionGrams / glassSize).toFixed(1);
-      const totalContainers = (data.totalSessionGrams / contSize).toFixed(1);
 
       banner.innerHTML = `
-        <div>
-          <span class="text-slate-500 font-bold block uppercase text-[10px]">Session Total</span>
-          <span class="text-sm font-black text-slate-900 font-mono">${data.totalSessionGrams.toLocaleString()}g</span>
-        </div>
-        <div>
-          <span class="text-slate-500 font-bold block uppercase text-[10px]">Glasses</span>
-          <span class="text-sm font-black text-slate-900 font-mono">${totalGlasses} Total</span>
-          <span class="text-[10px] text-slate-500 font-sans">(${data.fruitBatchGrams / glassSize} 🍎 + ${data.veggieBatchGrams / glassSize} 🥬)</span>
-        </div>
-        <div>
-          <span class="text-slate-500 font-bold block uppercase text-[10px]">Fridge Vessels</span>
-          <span class="text-sm font-black text-slate-900 font-mono">${totalContainers} &times; ${contSize >= 1000 && contSize % 1000 === 0 ? (contSize / 1000) + 'L' : contSize + 'g'}</span>
-        </div>
-        <div>
-          <span class="text-slate-500 font-bold block uppercase text-[10px]">Shared Items</span>
-          <span class="text-sm font-black text-indigo-700 font-mono">${data.entries.filter(e => e.isShared).length} shared between blenders</span>
+        <div class="space-y-2.5">
+          <!-- Top row: Live Metrics -->
+          <div class="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+            <div>
+              <span class="text-[10px] font-black uppercase text-slate-400 block">Yield</span>
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-xl sm:text-2xl font-black text-slate-900 font-mono">${data.totalGlasses}</span>
+                <span class="text-xs font-bold text-slate-600">glasses (${data.totalLiters} L)</span>
+              </div>
+            </div>
+
+            <div class="text-right">
+              <span class="text-[10px] font-black uppercase text-slate-400 block">Ratio (50/50)</span>
+              <span class="text-xs font-mono font-bold text-slate-700">
+                ${data.totalProduceGrams.toLocaleString()}g produce + ${data.totalLiquidGrams.toLocaleString()}g water
+              </span>
+            </div>
+          </div>
+
+          <!-- Second row: Individual Juice Breakdown -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <!-- Fruit Output -->
+            <div class="p-2 bg-amber-50/80 border border-amber-200/90 rounded-xl flex items-center justify-between">
+              <div>
+                <div class="font-black text-amber-950">
+                  ${data.fruitRec ? data.fruitRec.name : "Fruit"}
+                </div>
+                <div class="text-[10px] text-amber-800 font-medium">
+                  ${data.fruitProduceGrams.toLocaleString()}g produce &bull; ${data.fruitBlenders} load${data.fruitBlenders > 1 ? "s" : ""}
+                </div>
+              </div>
+              <div class="text-right font-mono">
+                <div class="text-sm font-black text-amber-950">${data.fruitGlasses} glasses</div>
+                <div class="text-[10px] text-amber-700">${data.fruitBatchGrams.toLocaleString()}g</div>
+              </div>
+            </div>
+
+            <!-- Veggie Output -->
+            <div class="p-2 bg-emerald-50/80 border border-emerald-200/90 rounded-xl flex items-center justify-between">
+              <div>
+                <div class="font-black text-emerald-950">
+                  ${data.veggieRec ? data.veggieRec.name : "Veggie"}
+                </div>
+                <div class="text-[10px] text-emerald-800 font-medium">
+                  ${data.veggieProduceGrams.toLocaleString()}g produce &bull; ${data.veggieBlenders} load${data.veggieBlenders > 1 ? "s" : ""}
+                </div>
+              </div>
+              <div class="text-right font-mono">
+                <div class="text-sm font-black text-emerald-950">${data.veggieGlasses} glasses</div>
+                <div class="text-[10px] text-emerald-700">${data.veggieBatchGrams.toLocaleString()}g</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Third row: Household & Fridge summary -->
+          <div class="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+            <span>${hh.numPeople} people &bull; ~${data.daysSupplied} days</span>
+            <span>${data.totalContainers} &times; ${contSize >= 1000 && contSize % 1000 === 0 ? (contSize / 1000) + "L" : contSize + "g"} containers</span>
+          </div>
         </div>
       `;
     }
@@ -2527,6 +2671,36 @@ class JuiceApp {
     const allCountEl = document.getElementById("sessionAllCount");
     if (sharedCountEl) sharedCountEl.textContent = sharedCount;
     if (allCountEl) allCountEl.textContent = allCount;
+
+    // Render Quick Produce Chips
+    const quickChipsContainer = document.getElementById("sessionQuickProduceChips");
+    if (quickChipsContainer) {
+      const catalogChips = [
+        { key: "spinach", name: "Spinach" },
+        { key: "kale", name: "Kale" },
+        { key: "green_apple", name: "Apple" },
+        { key: "beet", name: "Beet" },
+        { key: "carrot", name: "Carrot" },
+        { key: "ginger", name: "Ginger" },
+        { key: "lemon", name: "Lemon" },
+        { key: "strawberry", name: "Berry" },
+        { key: "chia", name: "Chia" }
+      ];
+      quickChipsContainer.innerHTML = catalogChips.map(c => `
+        <button type="button" class="session-quick-chip px-2 py-0.5 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-slate-700 text-xs font-bold transition touch-manipulation" data-key="${c.key}">
+          + ${c.name}
+        </button>
+      `).join("");
+
+      quickChipsContainer.querySelectorAll(".session-quick-chip").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const key = btn.getAttribute("data-key");
+          this.sessionCounterStock[key] = (this.sessionCounterStock[key] || 0) + 100;
+          this.renderDualBlendSessionPlanner();
+          this.showToast(`+100g ${key}`);
+        });
+      });
+    }
 
     this.renderDualBlendSessionDistribution();
   }
@@ -2547,8 +2721,8 @@ class JuiceApp {
 
     if (filtered.length === 0) {
       container.innerHTML = `
-        <div class="p-6 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
-          No ingredients match this filter for the selected blends.
+        <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
+          No items match.
         </div>
       `;
       return;
@@ -2556,101 +2730,85 @@ class JuiceApp {
 
     container.innerHTML = filtered.map(item => {
       let statusBadge = "";
-      if (item.hasAvailable) {
+      if (item.hasAvailable && item.availGrams > 0) {
         if (item.status === "exact") {
-          statusBadge = `<span class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">✅ 100% Covered</span>`;
+          statusBadge = `<span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">Covered</span>`;
         } else if (item.status === "surplus") {
-          statusBadge = `<span class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">➕ Surplus +${item.diff}g</span>`;
+          statusBadge = `<span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">+${item.diff}g</span>`;
         } else {
-          statusBadge = `<span class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-200">⚠️ Short by ${Math.abs(item.diff)}g (${Math.round((item.availGrams / item.totalNeeded) * 100)}%)</span>`;
+          statusBadge = `<span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-900">-${Math.abs(item.diff)}g</span>`;
         }
       }
 
       return `
-        <div class="p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5 transition hover:border-slate-300">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div class="produce-inventory-card p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2" data-produce-key="${item.key}">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
             <div class="flex items-center gap-2">
-              <span class="text-xl">${item.icon}</span>
-              <div>
-                <div class="flex items-center gap-2">
-                  <span class="font-black text-sm text-slate-900">${item.displayName}</span>
-                  ${item.isShared ? `
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-900 border border-indigo-200">
-                      ⚡ Shared in both
-                    </span>
-                  ` : (item.fruitGrams > 0 ? `
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                      🍎 Fruit only
-                    </span>
-                  ` : `
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                      🥬 Veggie only
-                    </span>
-                  `)}
-                </div>
-              </div>
+              <span class="font-black text-sm text-slate-900">${item.displayName}</span>
+              ${item.isShared ? `
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-indigo-100 text-indigo-900">
+                  Shared
+                </span>
+              ` : (item.fruitGrams > 0 ? `
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900">
+                  Fruit
+                </span>
+              ` : `
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  Veggie
+                </span>
+              `)}
             </div>
 
-            <div class="text-right self-start sm:self-auto font-mono">
-              <span class="text-xs text-slate-400 font-sans uppercase font-bold">Total Needed: </span>
-              <span class="text-sm font-black text-slate-900">${item.totalNeeded.toLocaleString()}g</span>
+            <!-- Stepper Input for Counter Produce -->
+            <div class="flex items-center gap-1 flex-shrink-0">
+              <button type="button" class="produce-step-btn w-7 h-7 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 font-black text-sm active:bg-slate-300 flex items-center justify-center select-none touch-manipulation" data-key="${item.key}" data-step="-25">–</button>
+              <div class="relative w-20">
+                <input type="number" min="0" max="10000" step="5" class="session-avail-input w-full px-2 py-1 text-xs font-black font-mono bg-white border border-slate-300 rounded-lg text-slate-900 text-center focus:ring-2 focus:ring-slate-900" placeholder="${item.totalNeeded}" value="${item.hasAvailable && item.availGrams > 0 ? item.availGrams : ""}" data-key="${item.key}" />
+                <span class="absolute right-1 top-1 text-[10px] font-mono text-slate-400">g</span>
+              </div>
+              <button type="button" class="produce-step-btn w-7 h-7 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 font-black text-sm active:bg-slate-300 flex items-center justify-center select-none touch-manipulation" data-key="${item.key}" data-step="25">+</button>
+              ${statusBadge}
             </div>
           </div>
 
-          <!-- Distribution Split Visualization -->
+          <!-- Allocation Routing Display -->
           ${item.isShared ? `
-            <div class="p-2.5 bg-white rounded-xl border border-slate-200 space-y-2">
+            <div class="p-2 bg-white rounded-lg border border-slate-200 space-y-1.5">
               <div class="flex items-center justify-between text-xs">
-                <div class="flex items-center gap-1.5 font-bold text-amber-900">
-                  <span>🍎 Fruit Blender:</span>
-                  <span class="font-mono font-black text-slate-900">${item.hasAvailable ? item.splitFruit : item.fruitGrams}g</span>
-                  <span class="text-[11px] text-slate-400 font-mono">(${item.fruitPct}%)</span>
+                <div class="font-bold text-amber-900">
+                  Fruit: <span class="font-mono font-black text-slate-900">${item.splitFruit}g</span> <span class="text-[10px] text-slate-400 font-mono">(${item.fruitPct}%)</span>
                 </div>
-                <div class="flex items-center gap-1.5 font-bold text-emerald-900">
-                  <span>🥬 Veggie Blender:</span>
-                  <span class="font-mono font-black text-slate-900">${item.hasAvailable ? item.splitVeggie : item.veggieGrams}g</span>
-                  <span class="text-[11px] text-slate-400 font-mono">(${item.veggiePct}%)</span>
+                <div class="font-bold text-emerald-900">
+                  Veggie: <span class="font-mono font-black text-slate-900">${item.splitVeggie}g</span> <span class="text-[10px] text-slate-400 font-mono">(${item.veggiePct}%)</span>
                 </div>
               </div>
 
-              <!-- Proportional Ratio Split Bar -->
-              <div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
-                <div class="bg-amber-400 h-full transition-all duration-300" style="width: ${item.fruitPct}%" title="Fruit: ${item.fruitPct}%"></div>
-                <div class="bg-emerald-400 h-full transition-all duration-300" style="width: ${item.veggiePct}%" title="Veggie: ${item.veggiePct}%"></div>
+              <!-- Interactive Split Ratio Slider -->
+              <input type="range" min="0" max="100" step="5" value="${item.fruitPct}" class="session-split-slider w-full h-1.5 rounded-lg touch-manipulation" data-key="${item.key}">
+
+              <!-- Presets -->
+              <div class="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                <button type="button" class="split-preset-btn px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200" data-key="${item.key}" data-split="100">100% Fruit</button>
+                <button type="button" class="split-preset-btn px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200" data-key="${item.key}" data-split="50">50/50</button>
+                <button type="button" class="split-preset-btn px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200" data-key="${item.key}" data-split="0">100% Veggie</button>
               </div>
             </div>
           ` : `
-            <div class="p-2 bg-white rounded-xl border border-slate-200 text-xs flex items-center justify-between">
-              <span class="font-bold text-slate-600">
-                ${item.fruitGrams > 0 ? "🍎 100% goes into Fruit Blender" : "🥬 100% goes into Veggie Blender"}
+            <div class="p-1.5 bg-white rounded-lg border border-slate-200 text-xs flex items-center justify-between">
+              <span class="text-slate-500 font-medium">
+                ${item.fruitGrams > 0 ? "Fruit" : "Veggie"}
               </span>
               <span class="font-mono font-black text-slate-900">
-                ${item.hasAvailable ? (item.fruitGrams > 0 ? item.splitFruit : item.splitVeggie) : item.totalNeeded}g
+                ${item.fruitGrams > 0 ? item.splitFruit : item.splitVeggie}g
               </span>
             </div>
           `}
-
-          <!-- Build From What's Available on Counter Input -->
-          <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200/60 text-xs">
-            <div class="flex items-center gap-2">
-              <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Available on Counter:</label>
-              <div class="relative w-28">
-                <input type="number" min="0" max="10000" step="5" class="session-avail-input w-full px-2.5 py-1 text-xs font-black font-mono bg-white border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-slate-900" placeholder="${item.totalNeeded}" value="${item.hasAvailable ? item.availGrams : ""}" data-key="${item.key}" />
-                <span class="absolute right-2 top-1 text-[11px] font-mono text-slate-400">g</span>
-              </div>
-              ${statusBadge}
-            </div>
-
-            ${item.hasAvailable && item.isShared ? `
-              <div class="text-[11px] font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
-                Split: 🍎 ${item.splitFruit}g &bull; 🥬 ${item.splitVeggie}g
-              </div>
-            ` : ""}
-          </div>
         </div>
       `;
     }).join("");
 
+    // Event Handlers for Counter Weight Inputs
     container.querySelectorAll(".session-avail-input").forEach(input => {
       input.addEventListener("input", (e) => {
         const key = e.target.getAttribute("data-key");
@@ -2660,9 +2818,149 @@ class JuiceApp {
         } else {
           this.sessionCounterStock[key] = Math.max(0, Number(val));
         }
-        this.renderDualBlendSessionDistribution();
+        this.renderDualBlendSessionPlanner();
       });
     });
+
+    // Touch Steppers (+/- buttons)
+    container.querySelectorAll(".produce-step-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const key = btn.getAttribute("data-key");
+        const step = parseFloat(btn.getAttribute("data-step")) || 25;
+        const current = this.sessionCounterStock[key] || 0;
+        const next = Math.max(0, current + step);
+        if (next === 0) {
+          delete this.sessionCounterStock[key];
+        } else {
+          this.sessionCounterStock[key] = next;
+        }
+        this.renderDualBlendSessionPlanner();
+      });
+    });
+
+    // Split Ratio Slider for Shared Produce
+    container.querySelectorAll(".session-split-slider").forEach(slider => {
+      slider.addEventListener("input", (e) => {
+        const key = e.target.getAttribute("data-key");
+        if (!this.sessionSharedSplits) this.sessionSharedSplits = {};
+        this.sessionSharedSplits[key] = Math.max(0, Math.min(100, Number(e.target.value)));
+        this.renderDualBlendSessionPlanner();
+      });
+    });
+
+    // Split Preset Buttons
+    container.querySelectorAll(".split-preset-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const key = btn.getAttribute("data-key");
+        const splitVal = Number(btn.getAttribute("data-split"));
+        if (!this.sessionSharedSplits) this.sessionSharedSplits = {};
+        this.sessionSharedSplits[key] = splitVal;
+        this.renderDualBlendSessionPlanner();
+      });
+    });
+  }
+
+  prefillSessionProduceFromRecipes() {
+    const data = this.getDualBlendSessionCalculations();
+    data.entries.forEach(e => {
+      this.sessionCounterStock[e.key] = e.totalNeeded;
+    });
+    this.renderDualBlendSessionPlanner();
+    this.showToast("Filled");
+  }
+
+  clearSessionProduce() {
+    this.sessionCounterStock = {};
+    if (this.sessionSharedSplits) this.sessionSharedSplits = {};
+    this.renderDualBlendSessionPlanner();
+    this.showToast("Cleared");
+  }
+
+  applySessionProduceAllocation() {
+    const data = this.getDualBlendSessionCalculations();
+    if (!data.fruitRec || !data.veggieRec) return;
+
+    if (data.totalProduceGrams <= 0) {
+      this.showToast("Enter produce weights", "warning");
+      return;
+    }
+
+    // 1. Update Fruit Recipe
+    const fruitEntries = data.entries.filter(e => e.splitFruit > 0);
+    const newFruitIngredients = [
+      {
+        id: "water",
+        name: "Water / Cold Filtered",
+        grams: data.fruitWaterGrams,
+        pct: Number(((data.fruitWaterGrams / data.fruitBatchGrams) * 100).toFixed(1)),
+        locked: true,
+        order: 1,
+        notes: "Base liquid (50% ratio)"
+      },
+      ...fruitEntries.map((e, idx) => ({
+        id: e.key,
+        name: e.displayName,
+        grams: e.splitFruit,
+        pct: Number(((e.splitFruit / data.fruitBatchGrams) * 100).toFixed(2)),
+        locked: false,
+        order: idx + 2,
+        notes: "Allocated produce"
+      }))
+    ];
+
+    const fruitSum = newFruitIngredients.reduce((s, i) => s + i.pct, 0);
+    if (fruitSum > 0 && Math.abs(fruitSum - 100) > 0.01) {
+      const diff = 100 - fruitSum;
+      newFruitIngredients[0].pct = Number((newFruitIngredients[0].pct + diff).toFixed(1));
+    }
+
+    data.fruitRec.baseBatchWeight = data.fruitBatchGrams;
+    data.fruitRec.ingredients = newFruitIngredients;
+
+    // 2. Update Veggie Recipe
+    const veggieEntries = data.entries.filter(e => e.splitVeggie > 0);
+    const newVeggieIngredients = [
+      {
+        id: "water",
+        name: "Water / Cold Filtered",
+        grams: data.veggieWaterGrams,
+        pct: Number(((data.veggieWaterGrams / data.veggieBatchGrams) * 100).toFixed(1)),
+        locked: true,
+        order: 1,
+        notes: "Base liquid (50% ratio)"
+      },
+      ...veggieEntries.map((e, idx) => ({
+        id: e.key,
+        name: e.displayName,
+        grams: e.splitVeggie,
+        pct: Number(((e.splitVeggie / data.veggieBatchGrams) * 100).toFixed(2)),
+        locked: false,
+        order: idx + 2,
+        notes: "Allocated produce"
+      }))
+    ];
+
+    const veggieSum = newVeggieIngredients.reduce((s, i) => s + i.pct, 0);
+    if (veggieSum > 0 && Math.abs(veggieSum - 100) > 0.01) {
+      const diff = 100 - veggieSum;
+      newVeggieIngredients[0].pct = Number((newVeggieIngredients[0].pct + diff).toFixed(1));
+    }
+
+    data.veggieRec.baseBatchWeight = data.veggieBatchGrams;
+    data.veggieRec.ingredients = newVeggieIngredients;
+
+    // If active recipe is fruit or veggie, update draft
+    if (this.currentRecipeId === data.fruitRec.id) {
+      this.draftRecipe = JSON.parse(JSON.stringify(data.fruitRec));
+      this.currentBatchTotalGrams = data.fruitBatchGrams;
+    } else if (this.currentRecipeId === data.veggieRec.id) {
+      this.draftRecipe = JSON.parse(JSON.stringify(data.veggieRec));
+      this.currentBatchTotalGrams = data.veggieBatchGrams;
+    }
+
+    this.saveState();
+    this.renderAll();
+    this.showToast("Applied");
   }
 
   /**
