@@ -186,3 +186,32 @@ input[type=range]::-webkit-slider-runnable-track {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Touch & Mobile Optimizations */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.stepper-btn {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Omitted / Out-of-Stock Ingredient Styling */
+.ingredient-card.is-omitted {
+  opacity: 0.65;
+  background-color: #f8fafc;
+  border-style: dashed;
+}
+
+.ingredient-card.is-omitted .ing-name-input {
+  text-decoration: line-through;
+  color: #64748b;
+}
+
+.reorder-touch-btn {
+  touch-action: manipulation;
+  user-select: none;
+}

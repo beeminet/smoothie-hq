@@ -461,6 +461,7 @@ class JuiceApp {
     this.isDraftDirty = false;
 
     this.kitchenStepIndex = 0;
+    this.kitchenLoadIndex = 0;
     this.kitchenScaleViewMode = "tare";
     this.activeTab = "builder";
     this.audioCtx = null;
@@ -505,7 +506,11 @@ class JuiceApp {
       if (!remoteState || !remoteState.recipes || remoteState.recipes.length === 0) return;
 
       const remoteTime = remoteState.lastSaved || "";
-      if (remoteTime && remoteTime !== this.state.lastSaved) {
+      const remoteDate = new Date(remoteTime).getTime();
+      const localDate = new Date(this.state.lastSaved || 0).getTime();
+
+      // Only overwrite if remote is valid and strictly newer than our local state
+      if (remoteTime && !isNaN(remoteDate) && remoteDate > localDate) {
         this.state = remoteState;
         this.lastSyncedServerTimestamp = remoteTime;
         localStorage.setItem(ACTIVE_STORAGE_KEY, JSON.stringify(this.state));
@@ -620,6 +625,7 @@ class JuiceApp {
           ...ing,
           pct: ing.pct !== undefined ? Number(ing.pct) : (totalGrams > 0 ? Number(((ing.grams / totalGrams) * 100).toFixed(2)) : 0),
           locked: ing.locked !== undefined ? Boolean(ing.locked) : (ing.id === "water"),
+          available: ing.available !== undefined ? Boolean(ing.available) : true,
           order: ing.order || (idx + 1)
         }));
 
@@ -723,13 +729,27 @@ class JuiceApp {
   }
 
   getScaledIngredients(recipe, totalBatchGrams) {
+    const ingredients = (recipe && recipe.ingredients) ? recipe.ingredients : [];
+    const activeItems = ingredients.filter(i => i.available !== false);
+    const activePctSum = activeItems.reduce((sum, item) => sum + (Number(item.pct) || 0), 0);
+
     let cumulative = 0;
-    return recipe.ingredients.map(item => {
-      const scaledGrams = Math.round((totalBatchGrams * (Number(item.pct) || 0)) / 100);
-      cumulative += scaledGrams;
+    return ingredients.map(item => {
+      const isAvailable = item.available !== false;
+      let scaledGrams = 0;
+      let effectivePct = 0;
+
+      if (isAvailable) {
+        effectivePct = activePctSum > 0 ? ((Number(item.pct) || 0) / activePctSum) * 100 : 0;
+        scaledGrams = Math.round((totalBatchGrams * effectivePct) / 100);
+        cumulative += scaledGrams;
+      }
+
       return {
         ...item,
+        available: isAvailable,
         scaledGrams,
+        effectivePct: Number(effectivePct.toFixed(2)),
         cumulativeTargetGrams: cumulative,
         percentage: Number(item.pct).toFixed(2),
         spoilageMeta: this.getIngredientSpoilageMeta(item.id, item.name)
@@ -840,6 +860,19 @@ class JuiceApp {
     this.renderRecipeBuilder();
   }
 
+  toggleDraftIngredientAvailability(ingredientIndex) {
+    const item = this.draftRecipe.ingredients[ingredientIndex];
+    if (!item) return;
+    item.available = item.available === false ? true : false;
+    this.isDraftDirty = true;
+    this.updateDirtyIndicator();
+    this.renderRecipeBuilder();
+    this.renderKitchenAssistant();
+    this.renderFridgeStoragePlanner();
+    this.renderGroceryCadencePlanner();
+    this.showToast(item.available ? `Included "${item.name}" in batch` : `Omitted "${item.name}" (formula preserved)`);
+  }
+
   moveDraftIngredient(index, direction) {
     const targetIndex = index + direction;
     if (targetIndex < 0 || targetIndex >= this.draftRecipe.ingredients.length) return;
@@ -861,6 +894,7 @@ class JuiceApp {
   updateDirtyIndicator() {
     const dirtyBadge = document.getElementById("builderUnsavedBadge");
     const saveBtn = document.getElementById("saveCurrentRecipeBtn");
+    const bottomSaveBtn = document.getElementById("bottomSaveRecipeBtn");
     const discardBtn = document.getElementById("discardChangesBtn");
 
     if (dirtyBadge) dirtyBadge.classList.toggle("hidden", !this.isDraftDirty);
@@ -869,11 +903,36 @@ class JuiceApp {
       if (this.isDraftDirty) saveBtn.classList.add("ring-2", "ring-slate-900");
       else saveBtn.classList.remove("ring-2", "ring-slate-900");
     }
+    if (bottomSaveBtn) {
+      if (this.isDraftDirty) bottomSaveBtn.classList.add("ring-2", "ring-slate-900");
+      else bottomSaveBtn.classList.remove("ring-2", "ring-slate-900");
+    }
   }
 
   commitDraftToSavedRecipe() {
     const savedIdx = this.state.recipes.findIndex(r => r.id === this.currentRecipeId);
     if (savedIdx >= 0) {
+      // 1. Always harvest all active input fields from DOM first (vital for mobile virtual keyboards)
+      document.querySelectorAll(".ing-name-input").forEach(inp => {
+        const idx = parseInt(inp.getAttribute("data-idx"), 10);
+        if (this.draftRecipe.ingredients[idx] && inp.value.trim()) {
+          this.draftRecipe.ingredients[idx].name = inp.value.trim();
+        }
+      });
+      document.querySelectorAll(".ing-notes-input").forEach(inp => {
+        const idx = parseInt(inp.getAttribute("data-idx"), 10);
+        if (this.draftRecipe.ingredients[idx]) {
+          this.draftRecipe.ingredients[idx].notes = inp.value.trim();
+        }
+      });
+      document.querySelectorAll(".ing-pct-num-input").forEach(inp => {
+        const idx = parseInt(inp.getAttribute("data-idx"), 10);
+        if (this.draftRecipe.ingredients[idx]) {
+          const val = parseFloat(inp.value);
+          if (!isNaN(val)) this.draftRecipe.ingredients[idx].pct = Math.max(0, val);
+        }
+      });
+
       const titleInput = document.getElementById("builderRecipeTitle");
       const descInput = document.getElementById("builderRecipeDesc");
       const notesInput = document.getElementById("builderRecipeNotesInput");
@@ -889,6 +948,7 @@ class JuiceApp {
       this.renderRecipeBuilder();
       this.renderFridgeStoragePlanner();
       this.renderGroceryCadencePlanner();
+      this.renderKitchenAssistant();
       this.showToast(`Saved "${this.draftRecipe.name}"`);
     }
   }
@@ -1009,30 +1069,99 @@ class JuiceApp {
       recipeSelect.addEventListener("change", e => {
         this.currentRecipeId = e.target.value;
         this.kitchenStepIndex = 0;
+        this.kitchenLoadIndex = 0;
         this.loadDraftRecipe();
         this.renderAll();
       });
     }
 
-    const onPeopleDaysChange = () => {
-      this.calcPeople = parseInt(document.getElementById("calcNumPeople")?.value, 10) || 5;
-      this.calcDays = parseInt(document.getElementById("calcDaysSupply")?.value, 10) || 1;
-      this.calcGlassesPerDay = parseFloat(document.getElementById("calcGlassesPerDay")?.value) || 1;
-      this.calcGuestGlasses = parseInt(document.getElementById("calcGuestGlasses")?.value, 10) || 0;
+    const onBatchSetupInputsChange = () => {
+      this.calcPeople = Math.max(1, parseInt(document.getElementById("calcNumPeople")?.value, 10) || 5);
+      this.calcDays = Math.max(1, parseInt(document.getElementById("calcDaysSupply")?.value, 10) || 1);
+      this.calcGlassesPerDay = Math.max(0.1, parseFloat(document.getElementById("calcGlassesPerDay")?.value) || 1);
+      this.calcGuestGlasses = Math.max(0, parseInt(document.getElementById("calcGuestGlasses")?.value, 10) || 0);
+
+      const glassSize = Math.max(50, parseInt(document.getElementById("calcGlassSize")?.value, 10) || 250);
+      const blenderCap = Math.max(200, parseInt(document.getElementById("calcBlenderCap")?.value, 10) || 2000);
+      const containerSize = Math.max(100, parseInt(document.getElementById("calcContainerSize")?.value, 10) || 1000);
+
+      this.state.household.numPeople = this.calcPeople;
+      this.state.household.glassSizeGrams = glassSize;
+      this.state.household.blenderMaxCapacityGrams = blenderCap;
+      this.state.household.containerSizeGrams = containerSize;
+
       this.recalculateBatchGramsFromInputs();
+      this.saveState();
+
+      this.updateHardwareSizesSummary();
       this.renderRecipeBuilder();
       this.renderFridgeStoragePlanner();
       this.renderGroceryCadencePlanner();
       this.renderKitchenAssistant();
     };
 
-    document.getElementById("calcNumPeople")?.addEventListener("input", onPeopleDaysChange);
-    document.getElementById("calcDaysSupply")?.addEventListener("input", onPeopleDaysChange);
-    document.getElementById("calcGlassesPerDay")?.addEventListener("input", onPeopleDaysChange);
-    document.getElementById("calcGuestGlasses")?.addEventListener("input", onPeopleDaysChange);
+    [
+      "calcNumPeople",
+      "calcDaysSupply",
+      "calcGlassesPerDay",
+      "calcGuestGlasses",
+      "calcGlassSize",
+      "calcBlenderCap",
+      "calcContainerSize"
+    ].forEach(id => {
+      const el = document.getElementById(id);
+      el?.addEventListener("input", onBatchSetupInputsChange);
+      el?.addEventListener("change", onBatchSetupInputsChange);
+    });
+
+    // Touch & mobile stepper buttons (+/-)
+    document.querySelectorAll(".stepper-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const targetId = btn.getAttribute("data-target");
+        const stepVal = parseFloat(btn.getAttribute("data-step")) || 1;
+        const input = document.getElementById(targetId);
+        if (!input) return;
+
+        let cur = parseFloat(input.value) || 0;
+        let next = cur + stepVal;
+        const min = input.min !== "" && !isNaN(parseFloat(input.min)) ? parseFloat(input.min) : 0;
+        const max = input.max !== "" && !isNaN(parseFloat(input.max)) ? parseFloat(input.max) : 99999;
+
+        if (next < min) next = min;
+        if (next > max) next = max;
+
+        next = Math.round(next * 100) / 100;
+        input.value = next;
+        onBatchSetupInputsChange();
+      });
+    });
+
+    const toggleHardwarePanel = (forceOpen) => {
+      const panel = document.getElementById("hardwareSizesPanel");
+      const chevron = document.getElementById("hardwareSizesChevron");
+      if (!panel) return;
+      const shouldOpen = forceOpen !== undefined ? forceOpen : panel.classList.contains("hidden");
+      if (shouldOpen) {
+        panel.classList.remove("hidden");
+        if (chevron) chevron.textContent = "▲ Close";
+      } else {
+        panel.classList.add("hidden");
+        if (chevron) chevron.textContent = "▼ Edit";
+      }
+    };
+
+    document.getElementById("toggleHardwareSizesBtn")?.addEventListener("click", () => {
+      toggleHardwarePanel();
+    });
 
     document.getElementById("saveCurrentRecipeBtn")?.addEventListener("click", () => {
       this.commitDraftToSavedRecipe();
+    });
+    document.getElementById("bottomSaveRecipeBtn")?.addEventListener("click", () => {
+      this.commitDraftToSavedRecipe();
+    });
+    document.getElementById("bottomAddIngredientBtn")?.addEventListener("click", () => {
+      this.addIngredientToDraftRecipe();
     });
     document.getElementById("discardChangesBtn")?.addEventListener("click", () => {
       this.discardDraftChanges();
@@ -1073,17 +1202,10 @@ class JuiceApp {
     });
 
     document.getElementById("openSettingsBtn")?.addEventListener("click", () => {
-      this.populateSettingsForm();
-      document.getElementById("settingsModal")?.classList.remove("hidden");
-    });
-    document.getElementById("closeSettingsBtn")?.addEventListener("click", () => {
-      document.getElementById("settingsModal")?.classList.add("hidden");
-    });
-    document.getElementById("saveSettingsBtn")?.addEventListener("click", () => {
-      this.saveSettingsForm();
-      document.getElementById("settingsModal")?.classList.add("hidden");
-      this.renderAll();
-      this.showToast("Parameters updated");
+      this.switchMode("plan");
+      toggleHardwarePanel(true);
+      document.getElementById("toggleHardwareSizesBtn")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      document.getElementById("calcGlassSize")?.focus();
     });
 
     document.getElementById("openDataManagementBtn")?.addEventListener("click", () => {
@@ -1385,11 +1507,18 @@ class JuiceApp {
     const dInp = document.getElementById("calcDaysSupply");
     const gInp = document.getElementById("calcGlassesPerDay");
     const guestInp = document.getElementById("calcGuestGlasses");
+    const glassInp = document.getElementById("calcGlassSize");
+    const blenderInp = document.getElementById("calcBlenderCap");
+    const containerInp = document.getElementById("calcContainerSize");
 
-    if (pInp) pInp.value = this.calcPeople;
-    if (dInp) dInp.value = this.calcDays;
-    if (gInp) gInp.value = this.calcGlassesPerDay;
-    if (guestInp) guestInp.value = this.calcGuestGlasses;
+    if (pInp && document.activeElement !== pInp) pInp.value = this.calcPeople;
+    if (dInp && document.activeElement !== dInp) dInp.value = this.calcDays;
+    if (gInp && document.activeElement !== gInp) gInp.value = this.calcGlassesPerDay;
+    if (guestInp && document.activeElement !== guestInp) guestInp.value = this.calcGuestGlasses;
+    if (glassInp && document.activeElement !== glassInp) glassInp.value = hh.glassSizeGrams || 250;
+    if (blenderInp && document.activeElement !== blenderInp) blenderInp.value = hh.blenderMaxCapacityGrams || 2000;
+    if (containerInp && document.activeElement !== containerInp) containerInp.value = hh.containerSizeGrams || 1000;
+    this.updateHardwareSizesSummary();
 
     document.querySelectorAll(".quick-batch-btn").forEach(btn => {
       const btnVal = parseInt(btn.getAttribute("data-batch-grams"), 10);
@@ -1414,9 +1543,39 @@ class JuiceApp {
         this.calcGuestGlasses > 0 ? `<span class="text-xs text-slate-500 font-bold block">(+${this.calcGuestGlasses} guests)</span>` : ""
       }`;
     }
-    if (statContainers) statContainers.textContent = `${totalContainers} &times; 1L containers`;
-    if (statBlenders) statBlenders.textContent = `${blenderBatches} blender loads`;
+    const containerUnit = (hh.containerSizeGrams >= 1000 && hh.containerSizeGrams % 1000 === 0)
+      ? `${hh.containerSizeGrams / 1000}L`
+      : `${hh.containerSizeGrams}g`;
+    if (statContainers) statContainers.textContent = `${totalContainers} \u00D7 ${containerUnit}`;
+    const split = this.getBlenderSplit();
+    if (statBlenders) {
+      statBlenders.textContent = split.loads > 1
+        ? `${split.loads} × ${split.perLoadGrams.toLocaleString()} g`
+        : `1 load`;
+    }
     if (statDays) statDays.textContent = `${daysSupplied} days (${hh.numPeople} people)`;
+
+    const splitPanel = document.getElementById("blenderSplitPanel");
+    if (splitPanel) {
+      if (split.loads > 1) {
+        const perLoadItems = this.getScaledIngredients(recipe, split.perLoadGrams);
+        splitPanel.classList.remove("hidden");
+        splitPanel.innerHTML = `
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+            <div class="font-bold text-slate-900">
+              Split into ${split.loads} identical blender loads of ${split.perLoadGrams.toLocaleString()}g
+              <span class="font-medium text-slate-500">(max ${split.cap.toLocaleString()}g each)</span>
+            </div>
+            <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-slate-600 font-mono">
+              ${perLoadItems.map(i => `<span>${i.name} <strong class="text-slate-900">${i.scaledGrams}g</strong></span>`).join("")}
+            </div>
+          </div>
+        `;
+      } else {
+        splitPanel.classList.add("hidden");
+        splitPanel.innerHTML = "";
+      }
+    }
 
     this.updateLiquidProduceRatioBar(scaledItems, targetGrams);
     this.updateDirtyIndicator();
@@ -1439,27 +1598,43 @@ class JuiceApp {
 
       rowsContainer.innerHTML = recipe.ingredients.map((item, idx) => {
         const scaled = scaledItems[idx];
+        const isOmitted = item.available === false;
 
         return `
-          <div class="ingredient-card p-3 bg-slate-50 border border-slate-200 rounded-xl transition hover:border-slate-300 ${item.locked ? "bg-slate-100/80 border-slate-300" : ""}" data-ing-idx="${idx}">
+          <div class="ingredient-card p-3 bg-slate-50 border border-slate-200 rounded-xl transition hover:border-slate-300 ${isOmitted ? "is-omitted" : ""} ${item.locked ? "bg-slate-100/80 border-slate-300" : ""}" data-ing-idx="${idx}">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-              <div class="flex items-center gap-1.5 flex-1">
+              <div class="flex items-center gap-1.5 flex-1 min-w-0">
                 
-                <!-- Drag Handle (Only this element initiates drag) -->
-                <div class="drag-handle cursor-grab active:cursor-grabbing px-2 py-1 text-slate-400 hover:text-slate-900 text-sm select-none font-bold rounded hover:bg-slate-200/60" data-ing-idx="${idx}" draggable="true" title="Drag handle to reorder">
-                  ⋮⋮
+                <!-- Reorder Controls: Drag Handle for Desktop + Tap Arrows for Mobile -->
+                <div class="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 flex-shrink-0">
+                  <div class="drag-handle cursor-grab active:cursor-grabbing px-1.5 py-1 text-slate-400 hover:text-slate-900 text-xs select-none font-bold rounded touch-manipulation" data-ing-idx="${idx}" draggable="true" title="Drag to reorder">
+                    ⋮⋮
+                  </div>
+                  <div class="flex flex-col">
+                    <button type="button" class="reorder-up-btn p-0.5 text-[10px] text-slate-500 hover:text-slate-900 disabled:opacity-20 leading-none touch-manipulation" data-idx="${idx}" ${idx === 0 ? "disabled" : ""} title="Move Up">▲</button>
+                    <button type="button" class="reorder-down-btn p-0.5 text-[10px] text-slate-500 hover:text-slate-900 disabled:opacity-20 leading-none touch-manipulation" data-idx="${idx}" ${idx === recipe.ingredients.length - 1 ? "disabled" : ""} title="Move Down">▼</button>
+                  </div>
                 </div>
 
-                <button type="button" class="lock-toggle-btn px-2 py-0.5 rounded-lg text-xs font-bold transition ${
+                <!-- Stock / Availability Toggle -->
+                <button type="button" class="stock-toggle-btn px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 flex-shrink-0 ${
+                  isOmitted ? "bg-slate-200 text-slate-600 border border-slate-300" : "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
+                }" data-idx="${idx}" title="${isOmitted ? "Omitted: tap to include when in stock" : "In stock: tap to omit from this batch"}">
+                  <span>${isOmitted ? "⚪ Omitted" : "🟢 In Stock"}</span>
+                </button>
+
+                <!-- Lock Toggle -->
+                <button type="button" class="lock-toggle-btn px-2 py-1 rounded-lg text-xs font-bold transition flex-shrink-0 ${
                   item.locked ? "bg-amber-100 text-amber-900 border border-amber-300" : "bg-white text-slate-500 border border-slate-200 hover:text-slate-900"
-                }" data-idx="${idx}" title="${item.locked ? "Locked: fixed percentage" : "Unlocked: balances automatically"}">
+                }" data-idx="${idx}" ${isOmitted ? "disabled" : ""} title="${item.locked ? "Locked: fixed percentage" : "Unlocked: balances automatically"}">
                   <span>${item.locked ? "Locked" : "Lock"}</span>
                 </button>
 
-                <input type="text" class="ing-name-input font-bold text-slate-800 text-sm bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-900 focus:bg-white px-1.5 py-0.5 rounded transition flex-1" value="${item.name}" placeholder="Ingredient Name" data-idx="${idx}" />
+                <!-- Ingredient Name -->
+                <input type="text" class="ing-name-input font-bold ${isOmitted ? "text-slate-400 line-through" : "text-slate-800"} text-sm bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-900 focus:bg-white px-1.5 py-0.5 rounded transition flex-1 min-w-0" value="${item.name}" placeholder="Ingredient Name" data-idx="${idx}" />
                 
-                ${recipe.ingredients.length > 2 ? `
-                  <button type="button" class="remove-ing-btn p-1 text-slate-400 hover:text-red-600 rounded transition" data-idx="${idx}" title="Remove ingredient">
+                ${recipe.ingredients.length > 1 ? `
+                  <button type="button" class="remove-ing-btn p-1 text-slate-400 hover:text-red-600 rounded transition ml-0.5 flex-shrink-0" data-idx="${idx}" title="Remove permanently">
                     &times;
                   </button>
                 ` : ""}
@@ -1468,29 +1643,77 @@ class JuiceApp {
               <div class="flex items-center justify-between sm:justify-end gap-3 font-mono">
                 <div class="text-right">
                   <div class="text-[10px] text-slate-400 font-sans uppercase">Scale:</div>
-                  <div class="text-sm font-black text-slate-900 ing-grams-display" data-idx="${idx}">${scaled.scaledGrams}g</div>
+                  <div class="text-sm font-black ${isOmitted ? "text-slate-400 font-normal" : "text-slate-900"} ing-grams-display" data-idx="${idx}">${isOmitted ? "0g" : `${scaled.scaledGrams}g`}</div>
                 </div>
 
                 <div class="relative w-20">
-                  <input type="number" step="0.1" min="0" max="100" class="ing-pct-num-input w-full pl-2 pr-6 py-1 border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 bg-white focus:ring-2 focus:ring-slate-900" value="${Number(item.pct).toFixed(1)}" data-idx="${idx}" ${item.locked ? "disabled" : ""} />
+                  <input type="number" step="0.1" min="0" max="100" class="ing-pct-num-input w-full pl-2 pr-6 py-1 border border-slate-300 rounded-lg text-xs font-mono font-bold ${isOmitted ? "text-slate-400 bg-slate-100" : "text-slate-900 bg-white"} focus:ring-2 focus:ring-slate-900" value="${Number(item.pct).toFixed(1)}" data-idx="${idx}" ${item.locked || isOmitted ? "disabled" : ""} />
                   <span class="absolute right-2 top-1 text-[11px] text-slate-400 font-semibold">%</span>
                 </div>
               </div>
             </div>
 
             <div class="flex items-center gap-3 pt-0.5">
-              <input type="range" min="0" max="80" step="0.25" value="${item.pct}" class="pct-slider flex-1 h-1.5 rounded-lg" data-idx="${idx}" ${item.locked ? "disabled" : ""} />
+              <input type="range" min="0" max="80" step="0.25" value="${item.pct}" class="pct-slider flex-1 h-1.5 rounded-lg" data-idx="${idx}" ${item.locked || isOmitted ? "disabled" : ""} />
             </div>
 
             <div class="mt-1 flex items-center justify-between text-[11px] text-slate-400">
               <input type="text" class="ing-notes-input w-full bg-transparent text-slate-500 text-xs italic px-1 py-0.5 border-b border-transparent hover:border-slate-200 focus:border-slate-900 focus:bg-white rounded" placeholder="Prep note" value="${item.notes || ""}" data-idx="${idx}" />
-              <span class="whitespace-nowrap ml-2 font-mono text-slate-600 bg-slate-200/60 px-1.5 py-0.5 rounded text-[10px] cumulative-display" data-idx="${idx}">Total: ${scaled.cumulativeTargetGrams}g</span>
+              <span class="whitespace-nowrap ml-2 font-mono text-slate-600 bg-slate-200/60 px-1.5 py-0.5 rounded text-[10px] cumulative-display" data-idx="${idx}">
+                ${isOmitted ? `Formula: ${Number(item.pct).toFixed(1)}%` : `Total: ${scaled.cumulativeTargetGrams}g`}
+              </span>
             </div>
           </div>
         `;
       }).join("");
 
-      // Drag and Drop Handlers strictly on the Handle
+      // Mobile Touch & Tap Reorder Handlers
+      rowsContainer.querySelectorAll(".reorder-up-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const idx = parseInt(btn.getAttribute("data-idx"), 10);
+          this.moveDraftIngredient(idx, -1);
+        });
+      });
+
+      rowsContainer.querySelectorAll(".reorder-down-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const idx = parseInt(btn.getAttribute("data-idx"), 10);
+          this.moveDraftIngredient(idx, 1);
+        });
+      });
+
+      // In-Stock / Availability Toggle Handler
+      rowsContainer.querySelectorAll(".stock-toggle-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const idx = parseInt(btn.getAttribute("data-idx"), 10);
+          this.toggleDraftIngredientAvailability(idx);
+        });
+      });
+
+      // Mobile Touch Drag on the Handle
+      let touchStartY = 0;
+      let touchDraggedIdx = null;
+
+      rowsContainer.querySelectorAll(".drag-handle").forEach(handle => {
+        handle.addEventListener("touchstart", (e) => {
+          touchDraggedIdx = parseInt(handle.getAttribute("data-ing-idx"), 10);
+          touchStartY = e.touches[0].clientY;
+        }, { passive: true });
+
+        handle.addEventListener("touchend", (e) => {
+          if (touchDraggedIdx === null) return;
+          const touchEndY = e.changedTouches[0].clientY;
+          const diff = touchEndY - touchStartY;
+          if (diff < -28 && touchDraggedIdx > 0) {
+            this.moveDraftIngredient(touchDraggedIdx, -1);
+          } else if (diff > 28 && touchDraggedIdx < this.draftRecipe.ingredients.length - 1) {
+            this.moveDraftIngredient(touchDraggedIdx, 1);
+          }
+          touchDraggedIdx = null;
+        });
+      });
+
+      // Desktop Drag and Drop Handlers strictly on the Handle
       let draggedCardIndex = null;
 
       rowsContainer.querySelectorAll(".drag-handle").forEach(handle => {
@@ -1612,11 +1835,12 @@ class JuiceApp {
     const scaledItems = this.getScaledIngredients(recipe, targetGrams);
 
     scaledItems.forEach((scaled, idx) => {
+      const isOmitted = scaled.available === false;
       const gramsEl = document.querySelector(`.ing-grams-display[data-idx="${idx}"]`);
-      if (gramsEl) gramsEl.textContent = `${scaled.scaledGrams}g`;
+      if (gramsEl) gramsEl.textContent = isOmitted ? "0g (Omitted)" : `${scaled.scaledGrams}g`;
 
       const cumulEl = document.querySelector(`.cumulative-display[data-idx="${idx}"]`);
-      if (cumulEl) cumulEl.textContent = `Total: ${scaled.cumulativeTargetGrams}g`;
+      if (cumulEl) cumulEl.textContent = isOmitted ? `Formula: ${Number(scaled.pct).toFixed(1)}%` : `Total: ${scaled.cumulativeTargetGrams}g`;
 
       const slider = document.querySelector(`.pct-slider[data-idx="${idx}"]`);
       if (slider && document.activeElement !== slider) slider.value = scaled.percentage;
@@ -1691,7 +1915,7 @@ class JuiceApp {
     const scaledItems = this.getScaledIngredients(recipe, targetGrams);
     const plannedDays = this.calcDays || 2;
 
-    const produceItems = scaledItems.filter(i => i.id !== "water" && i.id !== "sugar" && i.id !== "honey");
+    const produceItems = scaledItems.filter(i => i.available !== false && i.id !== "water" && i.id !== "sugar" && i.id !== "honey");
 
     container.innerHTML = `
       <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1776,7 +2000,7 @@ class JuiceApp {
     const plannedDays = this.calcDays || 2;
     const hh = this.state.household;
 
-    const produceItems = scaledItems.filter(i => i.id !== "water" && i.id !== "sugar" && i.id !== "honey");
+    const produceItems = scaledItems.filter(i => i.available !== false && i.id !== "water" && i.id !== "sugar" && i.id !== "honey");
 
     const groceryCalculations = produceItems.map(item => {
       const meta = item.spoilageMeta;
@@ -1803,11 +2027,11 @@ class JuiceApp {
           </div>
           <div>
             <div class="text-slate-500">Portions</div>
-            <div class="text-sm font-bold text-slate-900">${hh.numPeople} People &times; 250g ${this.calcGuestGlasses > 0 ? `(+${this.calcGuestGlasses})` : ""}</div>
+            <div class="text-sm font-bold text-slate-900">${hh.numPeople} People &times; ${hh.glassSizeGrams || 250}g ${this.calcGuestGlasses > 0 ? `(+${this.calcGuestGlasses})` : ""}</div>
           </div>
           <div>
             <div class="text-slate-500">Containers</div>
-            <div class="text-sm font-bold text-slate-900">${(targetGrams / 1000).toFixed(1)} &times; 1L</div>
+            <div class="text-sm font-bold text-slate-900">${(targetGrams / (hh.containerSizeGrams || 1000)).toFixed(1)} &times; ${(hh.containerSizeGrams >= 1000 && hh.containerSizeGrams % 1000 === 0) ? (hh.containerSizeGrams / 1000) + 'L' : (hh.containerSizeGrams || 1000) + 'g'}</div>
           </div>
           <div>
             <div class="text-slate-500">Gross Produce</div>
@@ -1895,10 +2119,26 @@ class JuiceApp {
     }
   }
 
+  /**
+   * Splits the total batch into the fewest identical blender loads
+   * that each fit within the blender's max capacity.
+   */
+  getBlenderSplit() {
+    const cap = Math.max(1, Number(this.state.household.blenderMaxCapacityGrams) || 2000);
+    const total = Math.max(1, Number(this.currentBatchTotalGrams) || 0);
+    const loads = Math.max(1, Math.ceil(total / cap));
+    const perLoadGrams = Math.round(total / loads);
+    return { loads, perLoadGrams, cap };
+  }
+
   renderKitchenAssistant() {
     const recipe = this.getSavedRecipe();
     const targetGrams = this.currentBatchTotalGrams;
-    const scaledItems = this.getScaledIngredients(recipe, targetGrams);
+    const split = this.getBlenderSplit();
+    if (this.kitchenLoadIndex >= split.loads) this.kitchenLoadIndex = split.loads - 1;
+    if (this.kitchenLoadIndex < 0) this.kitchenLoadIndex = 0;
+    const allScaled = this.getScaledIngredients(recipe, split.perLoadGrams);
+    const scaledItems = allScaled.filter(i => i.available !== false);
     const totalSteps = scaledItems.length;
 
     if (this.kitchenStepIndex >= totalSteps) {
@@ -1922,30 +2162,63 @@ class JuiceApp {
     const mainDisplay = document.getElementById("kitchenMainDisplay");
     if (mainDisplay) {
       if (this.kitchenStepIndex >= totalSteps) {
-        mainDisplay.innerHTML = `
-          <div class="text-center py-8 bg-white border border-slate-200 rounded-2xl p-6">
-            <h3 class="text-xl font-black text-slate-900">All Ingredients Loaded</h3>
-            <p class="text-xs text-slate-600 mt-1 max-w-md mx-auto">
-              Total Weight: <span class="font-bold text-slate-900 font-mono">${targetGrams.toLocaleString()}g</span> (${(targetGrams / 1000).toFixed(1)} &times; 1L containers = ${(targetGrams / 250).toFixed(1)} glasses). Secure lid and blend on high for 45-60s.
-            </p>
-            <div class="mt-4 flex justify-center gap-2">
-              <button type="button" id="kitchenRestartBtn" class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-800 hover:bg-slate-200 transition">
-                Start Over
-              </button>
-              <button type="button" id="kitchenLogBatchBtn" class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 transition">
-                Rate & Log Batch
-              </button>
-            </div>
-          </div>
-        `;
+        const hasMoreLoads = this.kitchenLoadIndex < split.loads - 1;
 
-        document.getElementById("kitchenRestartBtn")?.addEventListener("click", () => {
-          this.kitchenStepIndex = 0;
-          this.renderKitchenAssistant();
-        });
-        document.getElementById("kitchenLogBatchBtn")?.addEventListener("click", () => {
-          this.openNewLogModal();
-        });
+        if (hasMoreLoads) {
+          mainDisplay.innerHTML = `
+            <div class="text-center py-8 bg-white border border-slate-200 rounded-2xl p-6">
+              <h3 class="text-xl font-black text-slate-900">Blender ${this.kitchenLoadIndex + 1} of ${split.loads} loaded</h3>
+              <p class="text-xs text-slate-600 mt-1 max-w-md mx-auto">
+                Blend on high for 45-60s and pour into containers. Next is an identical load of <span class="font-bold text-slate-900 font-mono">${split.perLoadGrams.toLocaleString()}g</span>.
+              </p>
+              <div class="mt-4 flex justify-center gap-2">
+                <button type="button" id="kitchenBackBtn" class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-800 hover:bg-slate-200 transition">
+                  Back
+                </button>
+                <button type="button" id="kitchenNextLoadBtn" class="px-5 py-2.5 rounded-lg text-xs font-black bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition active:scale-95">
+                  Start Blender ${this.kitchenLoadIndex + 2} &rarr;
+                </button>
+              </div>
+            </div>
+          `;
+
+          document.getElementById("kitchenBackBtn")?.addEventListener("click", () => {
+            this.kitchenStepIndex = totalSteps - 1;
+            this.renderKitchenAssistant();
+          });
+          document.getElementById("kitchenNextLoadBtn")?.addEventListener("click", () => {
+            this.kitchenLoadIndex++;
+            this.kitchenStepIndex = 0;
+            this.playChime("step");
+            this.renderKitchenAssistant();
+          });
+        } else {
+          mainDisplay.innerHTML = `
+            <div class="text-center py-8 bg-white border border-slate-200 rounded-2xl p-6">
+              <h3 class="text-xl font-black text-slate-900">${split.loads > 1 ? "All Blenders Loaded" : "All Ingredients Loaded"}</h3>
+              <p class="text-xs text-slate-600 mt-1 max-w-md mx-auto">
+                Total Weight: <span class="font-bold text-slate-900 font-mono">${targetGrams.toLocaleString()}g</span> (${(targetGrams / (this.state.household.containerSizeGrams || 1000)).toFixed(1)} &times; ${(this.state.household.containerSizeGrams >= 1000 && this.state.household.containerSizeGrams % 1000 === 0) ? (this.state.household.containerSizeGrams / 1000) + 'L' : (this.state.household.containerSizeGrams || 1000) + 'g'} containers = ${(targetGrams / (this.state.household.glassSizeGrams || 250)).toFixed(1)} glasses). Secure lid and blend on high for 45-60s.
+              </p>
+              <div class="mt-4 flex justify-center gap-2">
+                <button type="button" id="kitchenRestartBtn" class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-800 hover:bg-slate-200 transition">
+                  Start Over
+                </button>
+                <button type="button" id="kitchenLogBatchBtn" class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 transition">
+                  Rate &amp; Log Batch
+                </button>
+              </div>
+            </div>
+          `;
+
+          document.getElementById("kitchenRestartBtn")?.addEventListener("click", () => {
+            this.kitchenStepIndex = 0;
+            this.kitchenLoadIndex = 0;
+            this.renderKitchenAssistant();
+          });
+          document.getElementById("kitchenLogBatchBtn")?.addEventListener("click", () => {
+            this.openNewLogModal();
+          });
+        }
       } else {
         const displayValue = this.kitchenScaleViewMode === "tare"
           ? `+${currentItem.scaledGrams.toLocaleString()} g`
@@ -1958,7 +2231,7 @@ class JuiceApp {
         mainDisplay.innerHTML = `
           <div class="scale-hero-display p-6 rounded-2xl bg-slate-900 text-white shadow-md relative">
             <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
-              <span>Step ${this.kitchenStepIndex + 1} of ${totalSteps}</span>
+              <span>${split.loads > 1 ? `Blender ${this.kitchenLoadIndex + 1} of ${split.loads} &bull; ` : ""}Step ${this.kitchenStepIndex + 1} of ${totalSteps}</span>
               <span>${recipe.name}</span>
             </div>
 
@@ -2241,20 +2514,14 @@ class JuiceApp {
     });
   }
 
-  populateSettingsForm() {
+  updateHardwareSizesSummary() {
+    const el = document.getElementById("hardwareSizesSummary");
+    if (!el) return;
     const hh = this.state.household;
-    document.getElementById("setNumPeople").value = hh.numPeople;
-    document.getElementById("setGlassSize").value = hh.glassSizeGrams;
-    document.getElementById("setBlenderCap").value = hh.blenderMaxCapacityGrams;
-    document.getElementById("setContainerSize").value = hh.containerSizeGrams;
-  }
-
-  saveSettingsForm() {
-    this.state.household.numPeople = parseInt(document.getElementById("setNumPeople").value, 10) || 5;
-    this.state.household.glassSizeGrams = parseInt(document.getElementById("setGlassSize").value, 10) || 250;
-    this.state.household.blenderMaxCapacityGrams = parseInt(document.getElementById("setBlenderCap").value, 10) || 2000;
-    this.state.household.containerSizeGrams = parseInt(document.getElementById("setContainerSize").value, 10) || 1000;
-    this.saveState();
+    const glass = hh.glassSizeGrams || 250;
+    const blender = (hh.blenderMaxCapacityGrams || 2000).toLocaleString();
+    const cont = (hh.containerSizeGrams || 1000).toLocaleString();
+    el.textContent = `${glass}g glass \u2022 ${blender}g blender \u2022 ${cont}g container`;
   }
 
   exportData() {
