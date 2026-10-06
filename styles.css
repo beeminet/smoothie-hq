@@ -211,7 +211,14 @@ input[type=range]::-webkit-slider-runnable-track {
   color: #64748b;
 }
 
-.reorder-touch-btn {
+.reorder-touch-btn, .reorder-up-btn, .reorder-down-btn {
   touch-action: manipulation;
   user-select: none;
+  -webkit-user-select: none;
+  min-width: 34px;
+  min-height: 34px;
+}
+
+.session-avail-input:focus {
+  background-color: #ffffff;
 }

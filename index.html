@@ -68,9 +68,9 @@
 
       <!-- 1. Recipe Selector & Top Actions -->
       <div class="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-sm">
-        <div class="flex items-center gap-2 flex-1">
+        <div class="flex items-center gap-2 flex-1 flex-wrap">
           <label for="recipeSelect" class="text-xs font-bold text-slate-500 uppercase tracking-wider">Blend:</label>
-          <div class="relative flex-1 max-w-md">
+          <div class="relative flex-1 min-w-[160px] max-w-md">
             <select id="recipeSelect" class="w-full bg-slate-50 border border-slate-300 font-extrabold text-slate-900 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-slate-900 appearance-none pr-8">
               <!-- Injected via JS -->
             </select>
@@ -81,14 +81,17 @@
           <button type="button" id="createNewRecipeBtn" class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition">
             + New
           </button>
+          <button type="button" id="renameCurrentRecipeBtn" class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition flex items-center gap-1" title="Rename this recipe">
+            ✏️ Rename
+          </button>
         </div>
 
         <div class="flex items-center gap-2 justify-end">
           <button type="button" id="openVersionHistoryBtn" class="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition">
             Versions <span id="builderCurrentVersionTag" class="px-1 py-0.2 rounded bg-slate-100 text-slate-700 font-mono text-[10px]">v1.0</span>
           </button>
-          <button type="button" id="deleteCurrentRecipeBtn" class="px-3 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs transition">
-            Delete
+          <button type="button" id="deleteCurrentRecipeBtn" class="px-3 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs transition flex items-center gap-1" title="Delete this recipe">
+            🗑️ Delete
           </button>
         </div>
       </div>
@@ -227,6 +230,101 @@
         <div class="pt-2" id="liquidProduceRatioBar"></div>
       </div>
 
+      <!-- DUAL-BLEND SESSION PLANNER & SHARED PRODUCE DISTRIBUTOR -->
+      <div id="dualBlendSessionSection" class="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-base font-black text-slate-900">🥣 Dual-Blend Session Planner</h2>
+              <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-indigo-100 text-indigo-900 uppercase tracking-wide">
+                Fruit + Veggie
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Blending two juices in one session? See total combined produce, how to distribute overlapping items between blenders, and build batches from what's available.
+            </p>
+          </div>
+
+          <button type="button" id="toggleDualBlendBtn" class="px-3.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition flex items-center gap-1.5 self-start sm:self-auto touch-manipulation">
+            <span id="toggleDualBlendIcon">▼</span> <span id="toggleDualBlendText">Expand Planner</span>
+          </button>
+        </div>
+
+        <div id="dualBlendContent" class="space-y-4">
+          <!-- Active Blend Pair Chooser -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+            <!-- Fruit Blend Chooser -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <label for="sessionFruitSelect" class="text-xs font-black text-amber-900 flex items-center gap-1">
+                  <span>🍎</span> Fruit Blend
+                </label>
+                <span id="sessionFruitGramsBadge" class="font-mono text-xs font-bold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">2,500g</span>
+              </div>
+              <select id="sessionFruitSelect" class="w-full bg-white border border-slate-300 font-bold text-slate-900 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-slate-900">
+                <!-- Injected via JS -->
+              </select>
+            </div>
+
+            <!-- Veggie Blend Chooser -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <label for="sessionVeggieSelect" class="text-xs font-black text-emerald-900 flex items-center gap-1">
+                  <span>🥬</span> Veggie Blend
+                </label>
+                <span id="sessionVeggieGramsBadge" class="font-mono text-xs font-bold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">2,500g</span>
+              </div>
+              <select id="sessionVeggieSelect" class="w-full bg-white border border-slate-300 font-bold text-slate-900 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-slate-900">
+                <!-- Injected via JS -->
+              </select>
+            </div>
+          </div>
+
+          <!-- Total Session Metric Banner -->
+          <div id="sessionStatsBanner" class="p-3 bg-gradient-to-r from-amber-50/70 to-emerald-50/70 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+            <!-- Injected via JS -->
+          </div>
+
+          <!-- Filter Tabs for Distribution -->
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold" id="sessionFilterTabs">
+              <button type="button" class="session-filter-btn px-3 py-1.5 rounded-lg bg-white text-slate-900 shadow-sm" data-filter="shared">
+                ⚡ Shared Produce (<span id="sessionSharedCount">0</span>)
+              </button>
+              <button type="button" class="session-filter-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900" data-filter="all">
+                All Items (<span id="sessionAllCount">0</span>)
+              </button>
+              <button type="button" class="session-filter-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900" data-filter="fruit">
+                🍎 Fruit Only
+              </button>
+              <button type="button" class="session-filter-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900" data-filter="veggie">
+                🥬 Veggie Only
+              </button>
+            </div>
+
+            <div class="text-[11px] text-slate-500 font-medium">
+              Enter counter stock to auto-split between blenders
+            </div>
+          </div>
+
+          <!-- Distribution Matrix / Cards -->
+          <div id="sessionDistributionList" class="space-y-2.5">
+            <!-- Injected via JS -->
+          </div>
+
+          <!-- Start Session Scale Mode Button -->
+          <div class="p-3.5 bg-slate-900 text-white rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div>
+              <div class="font-black text-sm">Ready to blend this 2-juice session?</div>
+              <div class="text-xs text-slate-300">Scale Mode allows switching between Fruit & Veggie blenders with 1 tap.</div>
+            </div>
+            <button type="button" id="startSessionScaleBtn" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 font-black text-xs transition shadow-sm whitespace-nowrap touch-manipulation">
+              🚀 Start Blending (Scale Mode)
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- 3. Step 2: Recipe Ingredients, Sliders & Drag Reorder -->
       <div class="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
         
@@ -329,6 +427,22 @@
     <!-- ============================================================= -->
     <div id="viewMakeScale" class="hidden space-y-6">
       
+      <!-- Dual-Blend Session Switcher (Instant 1-Tap Switching in Kitchen) -->
+      <div id="scaleSessionSwitcher" class="bg-slate-900 text-white rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-md">
+        <div class="flex items-center gap-2">
+          <span class="text-[11px] font-black uppercase tracking-wider text-slate-400">Blending:</span>
+          <span id="scaleCurrentBlendName" class="font-black text-sm text-white">Generic Fruit Blend</span>
+        </div>
+        <div class="flex items-center gap-2 p-1 bg-slate-800 rounded-xl" id="scaleBlendSwitchButtons">
+          <button type="button" id="scaleSwitchFruitBtn" class="px-3 py-1.5 rounded-lg text-xs font-black transition bg-amber-400 text-slate-950 shadow-sm flex items-center gap-1.5 touch-manipulation">
+            <span>🍎</span> <span id="scaleSwitchFruitLabel">Fruit Blend</span>
+          </button>
+          <button type="button" id="scaleSwitchVeggieBtn" class="px-3 py-1.5 rounded-lg text-xs font-black transition text-slate-300 hover:text-white flex items-center gap-1.5 touch-manipulation">
+            <span>🥬</span> <span id="scaleSwitchVeggieLabel">Veggie Blend</span>
+          </button>
+        </div>
+      </div>
+
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
         <div>
           <h2 class="text-base font-black text-slate-900">Scale Assistant</h2>
@@ -368,6 +482,28 @@
       </div>
     </div>
   </footer>
+
+  <!-- RENAME RECIPE MODAL -->
+  <div id="renameRecipeModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl p-5 max-w-sm w-full shadow-xl border border-slate-100 space-y-3">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <h3 class="text-sm font-black text-slate-900">Rename Recipe</h3>
+        <button type="button" id="closeRenameRecipeModalBtn" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-600 mb-1">New Recipe Name</label>
+        <input type="text" id="renameRecipeInput" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-900 text-sm focus:ring-2 focus:ring-slate-900" placeholder="e.g. Morning Glow" />
+      </div>
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <button type="button" id="cancelRenameBtn" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition">
+          Cancel
+        </button>
+        <button type="button" id="confirmRenameRecipeBtn" class="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition">
+          Save Name
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- DELETE RECIPE CONFIRM MODAL -->
   <div id="confirmDeleteRecipeModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
@@ -524,6 +660,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=3.1"></script>
+  <script src="app.js?v=3.2"></script>
 </body>
 </html>

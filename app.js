@@ -467,6 +467,14 @@ class JuiceApp {
     this.audioCtx = null;
     this.lastSyncedServerTimestamp = null;
 
+    const fruitDefault = this.state.recipes.find(r => r.type === "fruit") || this.state.recipes[0];
+    const veggieDefault = this.state.recipes.find(r => r.type === "veggie") || this.state.recipes[1] || this.state.recipes[0];
+    this.sessionFruitRecipeId = fruitDefault?.id || null;
+    this.sessionVeggieRecipeId = veggieDefault?.id || null;
+    this.sessionFilter = "shared";
+    this.sessionCounterStock = {};
+    this.isDualBlendExpanded = true;
+
     this.init();
     this.initServerRealTimeSync();
   }
@@ -946,6 +954,7 @@ class JuiceApp {
       this.isDraftDirty = false;
       this.renderRecipeOptions();
       this.renderRecipeBuilder();
+      this.renderDualBlendSessionPlanner();
       this.renderFridgeStoragePlanner();
       this.renderGroceryCadencePlanner();
       this.renderKitchenAssistant();
@@ -977,9 +986,20 @@ class JuiceApp {
   confirmDeleteRecipeExecution() {
     const idx = this.state.recipes.findIndex(r => r.id === this.currentRecipeId);
     if (idx >= 0) {
+      const deletedId = this.state.recipes[idx].id;
       const deletedName = this.state.recipes[idx].name;
       this.state.recipes.splice(idx, 1);
       this.currentRecipeId = this.state.recipes[0].id;
+
+      if (this.sessionFruitRecipeId === deletedId) {
+        const nextFruit = this.state.recipes.find(r => r.type === "fruit") || this.state.recipes[0];
+        this.sessionFruitRecipeId = nextFruit ? nextFruit.id : null;
+      }
+      if (this.sessionVeggieRecipeId === deletedId) {
+        const nextVeggie = this.state.recipes.find(r => r.type === "veggie") || this.state.recipes[0];
+        this.sessionVeggieRecipeId = nextVeggie ? nextVeggie.id : null;
+      }
+
       this.loadDraftRecipe();
       this.saveState();
       this.renderAll();
@@ -1094,6 +1114,7 @@ class JuiceApp {
       this.saveState();
 
       this.updateHardwareSizesSummary();
+      this.renderDualBlendSessionPlanner();
       this.renderRecipeBuilder();
       this.renderFridgeStoragePlanner();
       this.renderGroceryCadencePlanner();
@@ -1167,6 +1188,25 @@ class JuiceApp {
       this.discardDraftChanges();
     });
 
+    document.getElementById("renameCurrentRecipeBtn")?.addEventListener("click", () => {
+      this.openRenameRecipeModal();
+    });
+    document.getElementById("closeRenameRecipeModalBtn")?.addEventListener("click", () => {
+      document.getElementById("renameRecipeModal")?.classList.add("hidden");
+    });
+    document.getElementById("cancelRenameBtn")?.addEventListener("click", () => {
+      document.getElementById("renameRecipeModal")?.classList.add("hidden");
+    });
+    document.getElementById("confirmRenameRecipeBtn")?.addEventListener("click", () => {
+      this.confirmRenameRecipeExecution();
+    });
+    document.getElementById("renameRecipeInput")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        this.confirmRenameRecipeExecution();
+      }
+    });
+
     document.getElementById("deleteCurrentRecipeBtn")?.addEventListener("click", () => {
       this.deleteCurrentRecipe();
     });
@@ -1175,6 +1215,80 @@ class JuiceApp {
     });
     document.getElementById("confirmExecuteDeleteBtn")?.addEventListener("click", () => {
       this.confirmDeleteRecipeExecution();
+    });
+
+    // Dual-Blend Session Planner Bindings
+    document.getElementById("toggleDualBlendBtn")?.addEventListener("click", () => {
+      this.isDualBlendExpanded = !this.isDualBlendExpanded;
+      const content = document.getElementById("dualBlendContent");
+      const icon = document.getElementById("toggleDualBlendIcon");
+      const text = document.getElementById("toggleDualBlendText");
+      if (content) content.classList.toggle("hidden", !this.isDualBlendExpanded);
+      if (icon) icon.textContent = this.isDualBlendExpanded ? "▲" : "▼";
+      if (text) text.textContent = this.isDualBlendExpanded ? "Collapse" : "Expand Planner";
+    });
+
+    document.getElementById("sessionFruitSelect")?.addEventListener("change", (e) => {
+      this.sessionFruitRecipeId = e.target.value;
+      this.renderDualBlendSessionPlanner();
+    });
+
+    document.getElementById("sessionVeggieSelect")?.addEventListener("change", (e) => {
+      this.sessionVeggieRecipeId = e.target.value;
+      this.renderDualBlendSessionPlanner();
+    });
+
+    document.querySelectorAll(".session-filter-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        this.sessionFilter = btn.getAttribute("data-filter") || "shared";
+        document.querySelectorAll(".session-filter-btn").forEach(b => {
+          b.classList.remove("bg-white", "text-slate-900", "shadow-sm");
+          b.classList.add("text-slate-600");
+        });
+        btn.classList.add("bg-white", "text-slate-900", "shadow-sm");
+        btn.classList.remove("text-slate-600");
+        this.renderDualBlendSessionDistribution();
+      });
+    });
+
+    document.getElementById("startSessionScaleBtn")?.addEventListener("click", () => {
+      if (this.sessionFruitRecipeId) {
+        this.currentRecipeId = this.sessionFruitRecipeId;
+        this.kitchenStepIndex = 0;
+        this.kitchenLoadIndex = 0;
+        this.loadDraftRecipe();
+      }
+      this.switchMode("make");
+    });
+
+    // Scale Mode Quick Switcher Buttons
+    document.getElementById("scaleSwitchFruitBtn")?.addEventListener("click", () => {
+      const fruitRec = this.state.recipes.find(r => r.id === this.sessionFruitRecipeId) ||
+                       this.state.recipes.find(r => r.type === "fruit") ||
+                       this.state.recipes[0];
+      if (fruitRec) {
+        this.currentRecipeId = fruitRec.id;
+        this.kitchenStepIndex = 0;
+        this.kitchenLoadIndex = 0;
+        this.loadDraftRecipe();
+        this.renderKitchenAssistant();
+        this.showToast(`Switched to ${fruitRec.name}`);
+      }
+    });
+
+    document.getElementById("scaleSwitchVeggieBtn")?.addEventListener("click", () => {
+      const veggieRec = this.state.recipes.find(r => r.id === this.sessionVeggieRecipeId) ||
+                        this.state.recipes.find(r => r.type === "veggie") ||
+                        this.state.recipes[1] ||
+                        this.state.recipes[0];
+      if (veggieRec) {
+        this.currentRecipeId = veggieRec.id;
+        this.kitchenStepIndex = 0;
+        this.kitchenLoadIndex = 0;
+        this.loadDraftRecipe();
+        this.renderKitchenAssistant();
+        this.showToast(`Switched to ${veggieRec.name}`);
+      }
     });
 
     document.getElementById("scaleViewTare")?.addEventListener("click", () => {
@@ -1436,6 +1550,7 @@ class JuiceApp {
   renderAll() {
     this.renderRecipeOptions();
     this.renderHouseholdSummaryHeader();
+    this.renderDualBlendSessionPlanner();
     this.renderRecipeBuilder();
     this.renderKitchenAssistant();
     this.renderFridgeStoragePlanner();
@@ -1457,12 +1572,42 @@ class JuiceApp {
 
   renderRecipeOptions() {
     const select = document.getElementById("recipeSelect");
-    if (!select) return;
-    select.innerHTML = this.state.recipes.map(r => `
-      <option value="${r.id}" ${r.id === this.currentRecipeId ? "selected" : ""}>
-        ${r.name}
-      </option>
-    `).join("");
+    if (select) {
+      select.innerHTML = this.state.recipes.map(r => `
+        <option value="${r.id}" ${r.id === this.currentRecipeId ? "selected" : ""}>
+          ${r.name}
+        </option>
+      `).join("");
+    }
+
+    const fruitSelect = document.getElementById("sessionFruitSelect");
+    const veggieSelect = document.getElementById("sessionVeggieSelect");
+
+    if (fruitSelect) {
+      const fruitOptions = this.state.recipes.filter(r => r.type === "fruit" || r.type === "combo" || !r.type);
+      const list = fruitOptions.length > 0 ? fruitOptions : this.state.recipes;
+      if (!this.sessionFruitRecipeId && list.length > 0) {
+        this.sessionFruitRecipeId = list[0].id;
+      }
+      fruitSelect.innerHTML = list.map(r => `
+        <option value="${r.id}" ${r.id === this.sessionFruitRecipeId ? "selected" : ""}>
+          ${r.name}
+        </option>
+      `).join("");
+    }
+
+    if (veggieSelect) {
+      const veggieOptions = this.state.recipes.filter(r => r.type === "veggie" || r.type === "combo");
+      const list = veggieOptions.length > 0 ? veggieOptions : this.state.recipes;
+      if (!this.sessionVeggieRecipeId && list.length > 0) {
+        this.sessionVeggieRecipeId = list[0].id;
+      }
+      veggieSelect.innerHTML = list.map(r => `
+        <option value="${r.id}" ${r.id === this.sessionVeggieRecipeId ? "selected" : ""}>
+          ${r.name}
+        </option>
+      `).join("");
+    }
   }
 
   renderRecipeBuilder() {
@@ -1601,67 +1746,59 @@ class JuiceApp {
         const isOmitted = item.available === false;
 
         return `
-          <div class="ingredient-card p-3 bg-slate-50 border border-slate-200 rounded-xl transition hover:border-slate-300 ${isOmitted ? "is-omitted" : ""} ${item.locked ? "bg-slate-100/80 border-slate-300" : ""}" data-ing-idx="${idx}">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-              <div class="flex items-center gap-1.5 flex-1 min-w-0">
+          <div class="ingredient-card p-3 sm:p-4 bg-slate-50 border border-slate-200 rounded-2xl transition hover:border-slate-300 ${isOmitted ? "is-omitted" : ""} ${item.locked ? "bg-slate-100/80 border-slate-300" : ""}" data-ing-idx="${idx}">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div class="flex items-center gap-2 flex-1 min-w-0">
                 
-                <!-- Reorder Controls: Drag Handle for Desktop + Tap Arrows for Mobile -->
-                <div class="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 flex-shrink-0">
-                  <div class="drag-handle cursor-grab active:cursor-grabbing px-1.5 py-1 text-slate-400 hover:text-slate-900 text-xs select-none font-bold rounded touch-manipulation" data-ing-idx="${idx}" draggable="true" title="Drag to reorder">
+                <!-- Large Thumb-Friendly Reorder & Drag Cluster -->
+                <div class="flex items-center bg-slate-200/80 rounded-xl p-1 border border-slate-300/60 flex-shrink-0 shadow-inner">
+                  <button type="button" class="reorder-up-btn w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center text-sm font-black text-slate-700 hover:text-slate-900 active:bg-slate-300 rounded-lg disabled:opacity-20 touch-manipulation select-none" data-idx="${idx}" ${idx === 0 ? "disabled" : ""} title="Move Up">▲</button>
+                  <div class="drag-handle cursor-grab active:cursor-grabbing w-7 h-9 sm:w-6 sm:h-8 flex items-center justify-center text-slate-400 hover:text-slate-800 text-sm font-black select-none touch-manipulation" data-ing-idx="${idx}" draggable="true" title="Drag to reorder">
                     ⋮⋮
                   </div>
-                  <div class="flex flex-col">
-                    <button type="button" class="reorder-up-btn p-0.5 text-[10px] text-slate-500 hover:text-slate-900 disabled:opacity-20 leading-none touch-manipulation" data-idx="${idx}" ${idx === 0 ? "disabled" : ""} title="Move Up">▲</button>
-                    <button type="button" class="reorder-down-btn p-0.5 text-[10px] text-slate-500 hover:text-slate-900 disabled:opacity-20 leading-none touch-manipulation" data-idx="${idx}" ${idx === recipe.ingredients.length - 1 ? "disabled" : ""} title="Move Down">▼</button>
-                  </div>
+                  <button type="button" class="reorder-down-btn w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center text-sm font-black text-slate-700 hover:text-slate-900 active:bg-slate-300 rounded-lg disabled:opacity-20 touch-manipulation select-none" data-idx="${idx}" ${idx === recipe.ingredients.length - 1 ? "disabled" : ""} title="Move Down">▼</button>
                 </div>
 
                 <!-- Stock / Availability Toggle -->
-                <button type="button" class="stock-toggle-btn px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 flex-shrink-0 ${
+                <button type="button" class="stock-toggle-btn px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 flex-shrink-0 touch-manipulation ${
                   isOmitted ? "bg-slate-200 text-slate-600 border border-slate-300" : "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
-                }" data-idx="${idx}" title="${isOmitted ? "Omitted: tap to include when in stock" : "In stock: tap to omit from this batch"}">
+                }" data-idx="${idx}" title="${isOmitted ? "Omitted: tap to include in batch" : "In stock: tap to omit from batch"}">
                   <span>${isOmitted ? "⚪ Omitted" : "🟢 In Stock"}</span>
                 </button>
 
                 <!-- Lock Toggle -->
-                <button type="button" class="lock-toggle-btn px-2 py-1 rounded-lg text-xs font-bold transition flex-shrink-0 ${
+                <button type="button" class="lock-toggle-btn px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex-shrink-0 touch-manipulation ${
                   item.locked ? "bg-amber-100 text-amber-900 border border-amber-300" : "bg-white text-slate-500 border border-slate-200 hover:text-slate-900"
-                }" data-idx="${idx}" ${isOmitted ? "disabled" : ""} title="${item.locked ? "Locked: fixed percentage" : "Unlocked: balances automatically"}">
-                  <span>${item.locked ? "Locked" : "Lock"}</span>
+                }" data-idx="${idx}" ${isOmitted ? "disabled" : ""} title="${item.locked ? "Locked percentage" : "Auto-balanced"}">
+                  <span>${item.locked ? "🔒 Locked" : "🔓 Lock"}</span>
                 </button>
 
-                <!-- Ingredient Name -->
-                <input type="text" class="ing-name-input font-bold ${isOmitted ? "text-slate-400 line-through" : "text-slate-800"} text-sm bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-900 focus:bg-white px-1.5 py-0.5 rounded transition flex-1 min-w-0" value="${item.name}" placeholder="Ingredient Name" data-idx="${idx}" />
+                <!-- Ingredient Name: Big, Bold, Primary Element -->
+                <input type="text" class="ing-name-input font-black text-base sm:text-lg ${isOmitted ? "text-slate-400 line-through" : "text-slate-900"} bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-900 focus:bg-white px-2 py-1 rounded-lg transition flex-1 min-w-0" value="${item.name}" placeholder="Ingredient Name" data-idx="${idx}" />
                 
                 ${recipe.ingredients.length > 1 ? `
-                  <button type="button" class="remove-ing-btn p-1 text-slate-400 hover:text-red-600 rounded transition ml-0.5 flex-shrink-0" data-idx="${idx}" title="Remove permanently">
+                  <button type="button" class="remove-ing-btn w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 active:bg-red-50 rounded-lg text-lg font-bold transition ml-0.5 flex-shrink-0 touch-manipulation" data-idx="${idx}" title="Remove permanently">
                     &times;
                   </button>
                 ` : ""}
               </div>
 
+              <!-- Right: Target Weight & Percentage Input -->
               <div class="flex items-center justify-between sm:justify-end gap-3 font-mono">
                 <div class="text-right">
-                  <div class="text-[10px] text-slate-400 font-sans uppercase">Scale:</div>
-                  <div class="text-sm font-black ${isOmitted ? "text-slate-400 font-normal" : "text-slate-900"} ing-grams-display" data-idx="${idx}">${isOmitted ? "0g" : `${scaled.scaledGrams}g`}</div>
+                  <div class="text-base sm:text-lg font-black ${isOmitted ? "text-slate-400 font-normal line-through" : "text-slate-900"} ing-grams-display" data-idx="${idx}">${isOmitted ? "0g" : `${scaled.scaledGrams}g`}</div>
                 </div>
 
                 <div class="relative w-20">
-                  <input type="number" step="0.1" min="0" max="100" class="ing-pct-num-input w-full pl-2 pr-6 py-1 border border-slate-300 rounded-lg text-xs font-mono font-bold ${isOmitted ? "text-slate-400 bg-slate-100" : "text-slate-900 bg-white"} focus:ring-2 focus:ring-slate-900" value="${Number(item.pct).toFixed(1)}" data-idx="${idx}" ${item.locked || isOmitted ? "disabled" : ""} />
-                  <span class="absolute right-2 top-1 text-[11px] text-slate-400 font-semibold">%</span>
+                  <input type="number" step="0.1" min="0" max="100" class="ing-pct-num-input w-full pl-2 pr-6 py-1.5 border border-slate-300 rounded-xl text-xs font-mono font-bold ${isOmitted ? "text-slate-400 bg-slate-100" : "text-slate-900 bg-white"} focus:ring-2 focus:ring-slate-900" value="${Number(item.pct).toFixed(1)}" data-idx="${idx}" ${item.locked || isOmitted ? "disabled" : ""} />
+                  <span class="absolute right-2 top-1.5 text-[11px] text-slate-400 font-semibold">%</span>
                 </div>
               </div>
             </div>
 
-            <div class="flex items-center gap-3 pt-0.5">
-              <input type="range" min="0" max="80" step="0.25" value="${item.pct}" class="pct-slider flex-1 h-1.5 rounded-lg" data-idx="${idx}" ${item.locked || isOmitted ? "disabled" : ""} />
-            </div>
-
-            <div class="mt-1 flex items-center justify-between text-[11px] text-slate-400">
-              <input type="text" class="ing-notes-input w-full bg-transparent text-slate-500 text-xs italic px-1 py-0.5 border-b border-transparent hover:border-slate-200 focus:border-slate-900 focus:bg-white rounded" placeholder="Prep note" value="${item.notes || ""}" data-idx="${idx}" />
-              <span class="whitespace-nowrap ml-2 font-mono text-slate-600 bg-slate-200/60 px-1.5 py-0.5 rounded text-[10px] cumulative-display" data-idx="${idx}">
-                ${isOmitted ? `Formula: ${Number(item.pct).toFixed(1)}%` : `Total: ${scaled.cumulativeTargetGrams}g`}
-              </span>
+            <!-- Proportions Slider -->
+            <div class="flex items-center gap-3 pt-1">
+              <input type="range" min="0" max="80" step="0.25" value="${item.pct}" class="pct-slider flex-1 h-2 rounded-lg touch-manipulation" data-idx="${idx}" ${item.locked || isOmitted ? "disabled" : ""} />
             </div>
           </div>
         `;
@@ -2119,6 +2256,415 @@ class JuiceApp {
     }
   }
 
+  openRenameRecipeModal() {
+    const modal = document.getElementById("renameRecipeModal");
+    const input = document.getElementById("renameRecipeInput");
+    if (!modal || !input) return;
+    const rec = this.getSavedRecipe();
+    input.value = rec ? rec.name : "";
+    modal.classList.remove("hidden");
+    input.focus();
+    input.select();
+  }
+
+  confirmRenameRecipeExecution() {
+    const input = document.getElementById("renameRecipeInput");
+    const newName = input ? input.value.trim() : "";
+    if (!newName) {
+      this.showToast("Please enter a recipe name", "warning");
+      return;
+    }
+    const rec = this.getSavedRecipe();
+    if (rec) {
+      rec.name = newName;
+      if (this.draftRecipe) this.draftRecipe.name = newName;
+      this.saveState();
+      this.renderRecipeOptions();
+      this.renderRecipeBuilder();
+      this.renderDualBlendSessionPlanner();
+      this.pushToServer();
+      document.getElementById("renameRecipeModal")?.classList.add("hidden");
+      this.showToast(`Renamed to "${newName}"`);
+    }
+  }
+
+  updateScaleSessionSwitcherButtons() {
+    const currentNameEl = document.getElementById("scaleCurrentBlendName");
+    const fruitBtn = document.getElementById("scaleSwitchFruitBtn");
+    const veggieBtn = document.getElementById("scaleSwitchVeggieBtn");
+    const fruitLabel = document.getElementById("scaleSwitchFruitLabel");
+    const veggieLabel = document.getElementById("scaleSwitchVeggieLabel");
+
+    const currentRec = this.getSavedRecipe();
+    if (currentNameEl) currentNameEl.textContent = currentRec ? currentRec.name : "Current Blend";
+
+    const fruitRec = this.state.recipes.find(r => r.id === this.sessionFruitRecipeId) ||
+                     this.state.recipes.find(r => r.type === "fruit") ||
+                     this.state.recipes[0];
+    const veggieRec = this.state.recipes.find(r => r.id === this.sessionVeggieRecipeId) ||
+                      this.state.recipes.find(r => r.type === "veggie") ||
+                      this.state.recipes[1] ||
+                      this.state.recipes[0];
+
+    if (fruitLabel && fruitRec) fruitLabel.textContent = fruitRec.name;
+    if (veggieLabel && veggieRec) veggieLabel.textContent = veggieRec.name;
+
+    const isFruitActive = currentRec && fruitRec && currentRec.id === fruitRec.id;
+    const isVeggieActive = currentRec && veggieRec && currentRec.id === veggieRec.id;
+
+    if (fruitBtn) {
+      if (isFruitActive) {
+        fruitBtn.className = "px-3.5 py-1.5 rounded-lg text-xs font-black transition bg-amber-400 text-slate-950 shadow-sm flex items-center gap-1.5 touch-manipulation";
+      } else {
+        fruitBtn.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-300 hover:text-white flex items-center gap-1.5 touch-manipulation";
+      }
+    }
+    if (veggieBtn) {
+      if (isVeggieActive) {
+        veggieBtn.className = "px-3.5 py-1.5 rounded-lg text-xs font-black transition bg-emerald-400 text-slate-950 shadow-sm flex items-center gap-1.5 touch-manipulation";
+      } else {
+        veggieBtn.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-300 hover:text-white flex items-center gap-1.5 touch-manipulation";
+      }
+    }
+  }
+
+  normalizeProduceKey(id, name) {
+    const str = ((id || "") + " " + (name || "")).toLowerCase();
+    if (str.includes("lemon")) return { key: "lemon", name: "Lemon / Lemon Juice", icon: "🍋" };
+    if (str.includes("water") || str.includes("filtered")) return { key: "water", name: "Water / Cold Filtered", icon: "💧" };
+    if (str.includes("ginger")) return { key: "ginger", name: "Fresh Ginger", icon: "🫚" };
+    if (str.includes("pineapple")) return { key: "pineapple", name: "Pineapple", icon: "🍍" };
+    if (str.includes("avocado")) return { key: "avocado", name: "Avocado", icon: "🥑" };
+    if (str.includes("papaya")) return { key: "papaya", name: "Papaya", icon: "🍈" };
+    if (str.includes("mango")) return { key: "mango", name: "Mango", icon: "🥭" };
+    if (str.includes("cucumber")) return { key: "cucumber", name: "Cucumber", icon: "🥒" };
+    if (str.includes("celery")) return { key: "celery", name: "Celery", icon: "🥬" };
+    if (str.includes("apple")) return { key: "apple", name: "Apple", icon: "🍏" };
+    if (str.includes("spinach")) return { key: "spinach", name: "Spinach", icon: "🍃" };
+    if (str.includes("kale")) return { key: "kale", name: "Kale", icon: "🥬" };
+    if (str.includes("beet")) return { key: "beet", name: "Beetroot", icon: "🪵" };
+    if (str.includes("carrot")) return { key: "carrot", name: "Carrot", icon: "🥕" };
+    if (str.includes("zucchini")) return { key: "zucchini", name: "Zucchini", icon: "🥒" };
+    if (str.includes("sweet potato")) return { key: "sweet_potato", name: "Sweet Potato", icon: "🍠" };
+    if (str.includes("garlic")) return { key: "garlic", name: "Garlic", icon: "🧄" };
+    if (str.includes("honey") || str.includes("sugar")) return { key: "sweetener", name: "Honey / Sweetener", icon: "🍯" };
+    const cleanKey = (name || id || "produce").toLowerCase().replace(/[^a-z0-9]/g, "_");
+    return { key: cleanKey, name: name || id, icon: "🥗" };
+  }
+
+  getDualBlendSessionCalculations() {
+    const hh = this.state.household;
+    const glassSize = hh.glassSizeGrams || 250;
+    const people = this.calcPeople || 5;
+    const days = this.calcDays || 2;
+    const guests = this.calcGuestGlasses || 0;
+
+    const fruitRec = this.state.recipes.find(r => r.id === this.sessionFruitRecipeId) ||
+                     this.state.recipes.find(r => r.type === "fruit") ||
+                     this.state.recipes[0];
+    const veggieRec = this.state.recipes.find(r => r.id === this.sessionVeggieRecipeId) ||
+                      this.state.recipes.find(r => r.type === "veggie") ||
+                      this.state.recipes[1] ||
+                      this.state.recipes[0];
+
+    const fruitGlasses = people * days * (hh.fruitGlassesPerPersonPerDay || 1) + guests;
+    const veggieGlasses = people * days * (hh.veggieGlassesPerPersonPerDay || 1);
+
+    const fruitBatchGrams = Math.round(fruitGlasses * glassSize);
+    const veggieBatchGrams = Math.round(veggieGlasses * glassSize);
+    const totalSessionGrams = fruitBatchGrams + veggieBatchGrams;
+
+    const fruitScaled = this.getScaledIngredients(fruitRec, fruitBatchGrams);
+    const veggieScaled = this.getScaledIngredients(veggieRec, veggieBatchGrams);
+
+    const itemsMap = new Map();
+
+    fruitScaled.forEach(item => {
+      if (item.available === false) return;
+      const meta = this.normalizeProduceKey(item.id, item.name);
+      if (!itemsMap.has(meta.key)) {
+        itemsMap.set(meta.key, {
+          key: meta.key,
+          displayName: meta.name,
+          icon: meta.icon,
+          fruitGrams: 0,
+          veggieGrams: 0,
+          fruitItem: null,
+          veggieItem: null
+        });
+      }
+      const entry = itemsMap.get(meta.key);
+      entry.fruitGrams += item.scaledGrams;
+      entry.fruitItem = item;
+    });
+
+    veggieScaled.forEach(item => {
+      if (item.available === false) return;
+      const meta = this.normalizeProduceKey(item.id, item.name);
+      if (!itemsMap.has(meta.key)) {
+        itemsMap.set(meta.key, {
+          key: meta.key,
+          displayName: meta.name,
+          icon: meta.icon,
+          fruitGrams: 0,
+          veggieGrams: 0,
+          fruitItem: null,
+          veggieItem: null
+        });
+      }
+      const entry = itemsMap.get(meta.key);
+      entry.veggieGrams += item.scaledGrams;
+      entry.veggieItem = item;
+    });
+
+    const entries = Array.from(itemsMap.values()).map(entry => {
+      const isShared = entry.fruitGrams > 0 && entry.veggieGrams > 0;
+      const totalNeeded = entry.fruitGrams + entry.veggieGrams;
+      const fruitPct = totalNeeded > 0 ? (entry.fruitGrams / totalNeeded) * 100 : 0;
+      const veggiePct = totalNeeded > 0 ? (entry.veggieGrams / totalNeeded) * 100 : 0;
+
+      const userAvailable = this.sessionCounterStock[entry.key];
+      const hasAvailable = userAvailable !== undefined && userAvailable !== null && userAvailable !== "" && !isNaN(Number(userAvailable));
+      const availGrams = hasAvailable ? Number(userAvailable) : null;
+
+      let splitFruit = entry.fruitGrams;
+      let splitVeggie = entry.veggieGrams;
+      let diff = 0;
+      let status = "unentered";
+
+      if (hasAvailable) {
+        if (isShared) {
+          splitFruit = Math.round((availGrams * fruitPct) / 100);
+          splitVeggie = availGrams - splitFruit;
+        } else if (entry.fruitGrams > 0) {
+          splitFruit = availGrams;
+          splitVeggie = 0;
+        } else {
+          splitFruit = 0;
+          splitVeggie = availGrams;
+        }
+        diff = availGrams - totalNeeded;
+        if (diff === 0) status = "exact";
+        else if (diff > 0) status = "surplus";
+        else status = "short";
+      }
+
+      return {
+        ...entry,
+        isShared,
+        totalNeeded,
+        fruitPct: Number(fruitPct.toFixed(1)),
+        veggiePct: Number(veggiePct.toFixed(1)),
+        hasAvailable,
+        availGrams,
+        splitFruit,
+        splitVeggie,
+        diff,
+        status
+      };
+    });
+
+    entries.sort((a, b) => {
+      if (a.isShared && !b.isShared) return -1;
+      if (!a.isShared && b.isShared) return 1;
+      return b.totalNeeded - a.totalNeeded;
+    });
+
+    return {
+      fruitRec,
+      veggieRec,
+      fruitBatchGrams,
+      veggieBatchGrams,
+      totalSessionGrams,
+      entries
+    };
+  }
+
+  renderDualBlendSessionPlanner() {
+    const section = document.getElementById("dualBlendSessionSection");
+    if (!section) return;
+
+    this.renderRecipeOptions();
+    const data = this.getDualBlendSessionCalculations();
+
+    const fruitBadge = document.getElementById("sessionFruitGramsBadge");
+    const veggieBadge = document.getElementById("sessionVeggieGramsBadge");
+    if (fruitBadge && data.fruitRec) fruitBadge.textContent = `${data.fruitBatchGrams.toLocaleString()}g (${data.fruitRec.name})`;
+    if (veggieBadge && data.veggieRec) veggieBadge.textContent = `${data.veggieBatchGrams.toLocaleString()}g (${data.veggieRec.name})`;
+
+    const banner = document.getElementById("sessionStatsBanner");
+    if (banner) {
+      const hh = this.state.household;
+      const glassSize = hh.glassSizeGrams || 250;
+      const contSize = hh.containerSizeGrams || 1000;
+      const totalGlasses = (data.totalSessionGrams / glassSize).toFixed(1);
+      const totalContainers = (data.totalSessionGrams / contSize).toFixed(1);
+
+      banner.innerHTML = `
+        <div>
+          <span class="text-slate-500 font-bold block uppercase text-[10px]">Session Total</span>
+          <span class="text-sm font-black text-slate-900 font-mono">${data.totalSessionGrams.toLocaleString()}g</span>
+        </div>
+        <div>
+          <span class="text-slate-500 font-bold block uppercase text-[10px]">Glasses</span>
+          <span class="text-sm font-black text-slate-900 font-mono">${totalGlasses} Total</span>
+          <span class="text-[10px] text-slate-500 font-sans">(${data.fruitBatchGrams / glassSize} 🍎 + ${data.veggieBatchGrams / glassSize} 🥬)</span>
+        </div>
+        <div>
+          <span class="text-slate-500 font-bold block uppercase text-[10px]">Fridge Vessels</span>
+          <span class="text-sm font-black text-slate-900 font-mono">${totalContainers} &times; ${contSize >= 1000 && contSize % 1000 === 0 ? (contSize / 1000) + 'L' : contSize + 'g'}</span>
+        </div>
+        <div>
+          <span class="text-slate-500 font-bold block uppercase text-[10px]">Shared Items</span>
+          <span class="text-sm font-black text-indigo-700 font-mono">${data.entries.filter(e => e.isShared).length} shared between blenders</span>
+        </div>
+      `;
+    }
+
+    const sharedCount = data.entries.filter(e => e.isShared).length;
+    const allCount = data.entries.length;
+    const sharedCountEl = document.getElementById("sessionSharedCount");
+    const allCountEl = document.getElementById("sessionAllCount");
+    if (sharedCountEl) sharedCountEl.textContent = sharedCount;
+    if (allCountEl) allCountEl.textContent = allCount;
+
+    this.renderDualBlendSessionDistribution();
+  }
+
+  renderDualBlendSessionDistribution() {
+    const container = document.getElementById("sessionDistributionList");
+    if (!container) return;
+
+    const data = this.getDualBlendSessionCalculations();
+    let filtered = data.entries;
+    if (this.sessionFilter === "shared") {
+      filtered = data.entries.filter(e => e.isShared);
+    } else if (this.sessionFilter === "fruit") {
+      filtered = data.entries.filter(e => e.fruitGrams > 0 && e.veggieGrams === 0);
+    } else if (this.sessionFilter === "veggie") {
+      filtered = data.entries.filter(e => e.veggieGrams > 0 && e.fruitGrams === 0);
+    }
+
+    if (filtered.length === 0) {
+      container.innerHTML = `
+        <div class="p-6 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
+          No ingredients match this filter for the selected blends.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = filtered.map(item => {
+      let statusBadge = "";
+      if (item.hasAvailable) {
+        if (item.status === "exact") {
+          statusBadge = `<span class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">✅ 100% Covered</span>`;
+        } else if (item.status === "surplus") {
+          statusBadge = `<span class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">➕ Surplus +${item.diff}g</span>`;
+        } else {
+          statusBadge = `<span class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-200">⚠️ Short by ${Math.abs(item.diff)}g (${Math.round((item.availGrams / item.totalNeeded) * 100)}%)</span>`;
+        }
+      }
+
+      return `
+        <div class="p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5 transition hover:border-slate-300">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">${item.icon}</span>
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="font-black text-sm text-slate-900">${item.displayName}</span>
+                  ${item.isShared ? `
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-900 border border-indigo-200">
+                      ⚡ Shared in both
+                    </span>
+                  ` : (item.fruitGrams > 0 ? `
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                      🍎 Fruit only
+                    </span>
+                  ` : `
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      🥬 Veggie only
+                    </span>
+                  `)}
+                </div>
+              </div>
+            </div>
+
+            <div class="text-right self-start sm:self-auto font-mono">
+              <span class="text-xs text-slate-400 font-sans uppercase font-bold">Total Needed: </span>
+              <span class="text-sm font-black text-slate-900">${item.totalNeeded.toLocaleString()}g</span>
+            </div>
+          </div>
+
+          <!-- Distribution Split Visualization -->
+          ${item.isShared ? `
+            <div class="p-2.5 bg-white rounded-xl border border-slate-200 space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <div class="flex items-center gap-1.5 font-bold text-amber-900">
+                  <span>🍎 Fruit Blender:</span>
+                  <span class="font-mono font-black text-slate-900">${item.hasAvailable ? item.splitFruit : item.fruitGrams}g</span>
+                  <span class="text-[11px] text-slate-400 font-mono">(${item.fruitPct}%)</span>
+                </div>
+                <div class="flex items-center gap-1.5 font-bold text-emerald-900">
+                  <span>🥬 Veggie Blender:</span>
+                  <span class="font-mono font-black text-slate-900">${item.hasAvailable ? item.splitVeggie : item.veggieGrams}g</span>
+                  <span class="text-[11px] text-slate-400 font-mono">(${item.veggiePct}%)</span>
+                </div>
+              </div>
+
+              <!-- Proportional Ratio Split Bar -->
+              <div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
+                <div class="bg-amber-400 h-full transition-all duration-300" style="width: ${item.fruitPct}%" title="Fruit: ${item.fruitPct}%"></div>
+                <div class="bg-emerald-400 h-full transition-all duration-300" style="width: ${item.veggiePct}%" title="Veggie: ${item.veggiePct}%"></div>
+              </div>
+            </div>
+          ` : `
+            <div class="p-2 bg-white rounded-xl border border-slate-200 text-xs flex items-center justify-between">
+              <span class="font-bold text-slate-600">
+                ${item.fruitGrams > 0 ? "🍎 100% goes into Fruit Blender" : "🥬 100% goes into Veggie Blender"}
+              </span>
+              <span class="font-mono font-black text-slate-900">
+                ${item.hasAvailable ? (item.fruitGrams > 0 ? item.splitFruit : item.splitVeggie) : item.totalNeeded}g
+              </span>
+            </div>
+          `}
+
+          <!-- Build From What's Available on Counter Input -->
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200/60 text-xs">
+            <div class="flex items-center gap-2">
+              <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Available on Counter:</label>
+              <div class="relative w-28">
+                <input type="number" min="0" max="10000" step="5" class="session-avail-input w-full px-2.5 py-1 text-xs font-black font-mono bg-white border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-slate-900" placeholder="${item.totalNeeded}" value="${item.hasAvailable ? item.availGrams : ""}" data-key="${item.key}" />
+                <span class="absolute right-2 top-1 text-[11px] font-mono text-slate-400">g</span>
+              </div>
+              ${statusBadge}
+            </div>
+
+            ${item.hasAvailable && item.isShared ? `
+              <div class="text-[11px] font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+                Split: 🍎 ${item.splitFruit}g &bull; 🥬 ${item.splitVeggie}g
+              </div>
+            ` : ""}
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    container.querySelectorAll(".session-avail-input").forEach(input => {
+      input.addEventListener("input", (e) => {
+        const key = e.target.getAttribute("data-key");
+        const val = e.target.value.trim();
+        if (val === "" || isNaN(Number(val))) {
+          delete this.sessionCounterStock[key];
+        } else {
+          this.sessionCounterStock[key] = Math.max(0, Number(val));
+        }
+        this.renderDualBlendSessionDistribution();
+      });
+    });
+  }
+
   /**
    * Splits the total batch into the fewest identical blender loads
    * that each fit within the blender's max capacity.
@@ -2133,6 +2679,7 @@ class JuiceApp {
 
   renderKitchenAssistant() {
     const recipe = this.getSavedRecipe();
+    this.updateScaleSessionSwitcherButtons();
     const targetGrams = this.currentBatchTotalGrams;
     const split = this.getBlenderSplit();
     if (this.kitchenLoadIndex >= split.loads) this.kitchenLoadIndex = split.loads - 1;
