@@ -237,3 +237,14 @@ input[type=range]::-webkit-slider-runnable-track {
   border-color: #0f172a;
   background-color: #ffffff;
 }
+
+/* Prevent horizontal overflow and clipping on mobile screens */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+#viewPlanRecipe, #viewMakeScale {
+  max-width: 100%;
+  overflow-x: hidden;
+}

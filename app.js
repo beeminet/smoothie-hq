@@ -507,47 +507,67 @@ class JuiceApp {
     });
   }
 
-  async pullFromServer() {
+  async pullFromServer(force = false) {
     try {
       const res = await fetch("/api/sync", { cache: "no-store" });
-      if (!res.ok) return;
+      if (!res.ok) {
+        if (force) this.showToast("Cloud endpoint unreachable", "error");
+        return;
+      }
       const remoteState = await res.json();
-      if (!remoteState || !remoteState.recipes || remoteState.recipes.length === 0) return;
+      if (!remoteState || !remoteState.recipes || remoteState.recipes.length === 0) {
+        if (force) this.showToast("Cloud data is empty", "warning");
+        return;
+      }
 
       const remoteTime = remoteState.lastSaved || "";
       const remoteDate = new Date(remoteTime).getTime();
       const localDate = new Date(this.state.lastSaved || 0).getTime();
 
-      // Only overwrite if remote is valid and strictly newer than our local state
-      if (remoteTime && !isNaN(remoteDate) && remoteDate > localDate) {
+      // Overwrite if forced or if remote is valid and newer than local state (or local lacks timestamp)
+      if (force || !localDate || (remoteTime && !isNaN(remoteDate) && remoteDate > localDate)) {
         this.state = remoteState;
-        this.lastSyncedServerTimestamp = remoteTime;
+        this.lastSyncedServerTimestamp = remoteTime || new Date().toISOString();
         localStorage.setItem(ACTIVE_STORAGE_KEY, JSON.stringify(this.state));
 
-        // Re-load draft and render if not actively editing
-        if (!this.isDraftDirty) {
+        // Re-load draft and render if not actively editing or if forced
+        if (!this.isDraftDirty || force) {
           const currentExists = this.state.recipes.find(r => r.id === this.currentRecipeId);
           if (!currentExists) this.currentRecipeId = this.state.recipes[0].id;
           this.loadDraftRecipe();
           this.renderAll();
           this.updateLastSavedIndicator();
         }
+
+        const syncJson = document.getElementById("syncJsonArea");
+        if (syncJson) syncJson.value = JSON.stringify(this.state, null, 2);
+
+        if (force) {
+          this.showToast("Cloud data synced");
+        }
       }
     } catch (e) {
-      // Server not reachable (offline / standalone), fallback to localStorage
+      if (force) this.showToast("Failed to connect to cloud", "error");
     }
   }
 
-  async pushToServer() {
+  async pushToServer(notify = false) {
     try {
-      await fetch("/api/sync", {
+      this.state.lastSaved = new Date().toISOString();
+      localStorage.setItem(ACTIVE_STORAGE_KEY, JSON.stringify(this.state));
+      const res = await fetch("/api/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(this.state)
       });
-      this.lastSyncedServerTimestamp = this.state.lastSaved;
+      if (res.ok) {
+        this.lastSyncedServerTimestamp = this.state.lastSaved;
+        if (notify) this.showToast("Cloud sync complete");
+      } else {
+        if (notify) this.showToast("Cloud sync error", "error");
+      }
     } catch (e) {
-      // Server offline, preserved in localStorage
+      if (notify) this.showToast("Cloud unreachable", "error");
     }
   }
 
@@ -1345,6 +1365,13 @@ class JuiceApp {
       document.getElementById("dataManagementModal")?.classList.add("hidden");
     });
 
+    document.getElementById("manualPullCloudBtn")?.addEventListener("click", () => {
+      this.pullFromServer(true);
+    });
+    document.getElementById("manualPushCloudBtn")?.addEventListener("click", () => {
+      this.pushToServer(true);
+    });
+
     document.getElementById("copyDbClipboardBtn")?.addEventListener("click", () => {
       const jsonStr = JSON.stringify(this.state, null, 2);
       const textarea = document.getElementById("syncJsonArea");
@@ -1745,12 +1772,9 @@ class JuiceApp {
 
       const sumBadge = document.getElementById("builderTotalPctBadge");
       if (sumBadge) {
-        sumBadge.innerHTML = `
-          <span>Total: ${sumPct.toFixed(1)}%</span>
-          <span>${isPerfect100 ? "100%" : "Auto-balanced"}</span>
-        `;
-        sumBadge.className = `flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 rounded-lg border ${
-          isPerfect100 ? "text-slate-800 bg-slate-50 border-slate-200" : "text-amber-700 bg-amber-50 border-amber-200"
+        sumBadge.innerHTML = `<span>${isPerfect100 ? "100%" : sumPct.toFixed(1) + "%"}</span>`;
+        sumBadge.className = `font-mono text-[11px] font-bold px-2 py-0.5 rounded-lg border ${
+          isPerfect100 ? "text-slate-700 bg-slate-50 border-slate-200" : "text-amber-800 bg-amber-50 border-amber-200"
         }`;
       }
 

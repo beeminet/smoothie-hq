@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0" />
   <title>Smoothie HQ</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="styles.css?v=3.1" />
+  <link rel="stylesheet" href="styles.css?v=3.2" />
 </head>
 <body class="bg-slate-100 text-slate-900 min-h-screen flex flex-col antialiased">
 
@@ -163,30 +163,32 @@
       <!-- STEP 2: RECIPE BUILDER -->
       <div class="space-y-4">
         <!-- Recipe Selector & Top Actions -->
-        <div class="bg-white border border-slate-200 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shadow-sm">
-          <div class="flex items-center gap-2 flex-1 flex-wrap">
-            <label for="recipeSelect" class="text-xs font-bold text-slate-500 uppercase">Blend:</label>
-            <div class="relative flex-1 min-w-[140px] max-w-md">
-              <select id="recipeSelect" class="w-full bg-slate-50 border border-slate-300 font-extrabold text-slate-900 rounded-xl px-3 py-1.5 text-sm focus:ring-2 focus:ring-slate-900 appearance-none pr-8">
+        <div class="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 space-y-2.5 shadow-sm">
+          <!-- Row 1: Blend Chooser + New -->
+          <div class="flex items-center gap-2">
+            <label for="recipeSelect" class="text-xs font-bold text-slate-500 uppercase flex-shrink-0">Blend:</label>
+            <div class="relative flex-1 min-w-0">
+              <select id="recipeSelect" class="w-full bg-slate-50 border border-slate-300 font-extrabold text-slate-900 rounded-xl px-3 py-1.5 text-xs sm:text-sm focus:ring-2 focus:ring-slate-900 appearance-none pr-7 truncate">
                 <!-- Injected via JS -->
               </select>
-              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
               </div>
             </div>
-            <button type="button" id="createNewRecipeBtn" class="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition">
+            <button type="button" id="createNewRecipeBtn" class="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition flex-shrink-0">
               + New
-            </button>
-            <button type="button" id="renameCurrentRecipeBtn" class="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition">
-              Rename
             </button>
           </div>
 
-          <div class="flex items-center gap-2 justify-end">
-            <button type="button" id="openVersionHistoryBtn" class="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition">
+          <!-- Row 2: Secondary actions in a clean, balanced strip -->
+          <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-xs">
+            <button type="button" id="renameCurrentRecipeBtn" class="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold transition">
+              Rename
+            </button>
+            <button type="button" id="openVersionHistoryBtn" class="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold transition">
               Versions <span id="builderCurrentVersionTag" class="px-1 py-0.2 rounded bg-slate-100 text-slate-700 font-mono text-[10px]">v1.0</span>
             </button>
-            <button type="button" id="deleteCurrentRecipeBtn" class="px-2.5 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs transition">
+            <button type="button" id="deleteCurrentRecipeBtn" class="px-2.5 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-bold transition">
               Delete
             </button>
           </div>
@@ -194,20 +196,20 @@
 
         <!-- Recipe Ingredients & Proportions -->
         <div class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
-          <div class="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
-            <div class="flex items-center gap-2">
-              <h2 class="text-base font-black text-slate-900">2. Ingredients</h2>
-              <span id="builderUnsavedBadge" class="hidden px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+              <h2 class="text-base font-black text-slate-900 whitespace-nowrap">2. Ingredients</h2>
+              <span id="builderUnsavedBadge" class="hidden px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900">
                 Unsaved
               </span>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5 flex-wrap justify-end">
               <div id="builderTotalPctBadge"></div>
               <button type="button" id="discardChangesBtn" class="hidden px-2.5 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold text-xs transition">
                 Discard
               </button>
-              <button type="button" id="saveCurrentRecipeBtn" class="px-3.5 py-1.5 rounded-lg bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition">
+              <button type="button" id="saveCurrentRecipeBtn" class="px-3.5 py-1.5 rounded-lg bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition shadow-sm">
                 Save
               </button>
             </div>
@@ -513,21 +515,37 @@
   <div id="dataManagementModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white rounded-2xl p-4 sm:p-5 max-w-lg w-full shadow-xl border border-slate-100 space-y-3">
       <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-        <h3 class="text-sm font-black text-slate-900">Sync &amp; Backup</h3>
+        <h3 class="text-sm font-black text-slate-900">Cloud Sync &amp; Backup</h3>
         <button type="button" id="closeDataModalBtn" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
       </div>
 
+      <!-- Live Cloud Sync Control -->
+      <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+        <div class="flex items-center justify-between text-xs">
+          <span class="font-bold text-slate-700">Real-Time Cloud Sync:</span>
+          <span id="cloudSyncStatusBadge" class="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Active</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 pt-0.5">
+          <button type="button" id="manualPullCloudBtn" class="px-3 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-900 font-bold text-xs rounded-lg transition text-center shadow-sm">
+            Pull from Cloud
+          </button>
+          <button type="button" id="manualPushCloudBtn" class="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition text-center shadow-sm">
+            Push to Cloud
+          </button>
+        </div>
+      </div>
+
       <div>
-        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Database (JSON)</label>
-        <textarea id="syncJsonArea" rows="6" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono text-[11px] text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-900" placeholder="JSON data..."></textarea>
+        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Database Backup (JSON)</label>
+        <textarea id="syncJsonArea" rows="5" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono text-[11px] text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-900" placeholder="JSON data..."></textarea>
       </div>
 
       <div class="grid grid-cols-2 gap-2 pt-1">
-        <button type="button" id="copyDbClipboardBtn" class="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition text-center">
+        <button type="button" id="copyDbClipboardBtn" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition text-center border border-slate-200">
           Copy
         </button>
         
-        <button type="button" id="pasteDbRestoreBtn" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold text-xs rounded-xl transition text-center border border-slate-300">
+        <button type="button" id="pasteDbRestoreBtn" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition text-center border border-slate-200">
           Load
         </button>
       </div>
@@ -643,6 +661,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=3.4"></script>
+  <script src="app.js?v=3.5"></script>
 </body>
 </html>
